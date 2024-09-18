@@ -1,1 +1,17 @@
+# Ignorar el entorno virtual completo
+venvia/
+
+# Ignorar archivos específicos de PyTorch que son demasiado grandes
+venvia/Lib/site-packages/torch/lib/torch_cpu.dll
+venvia/Lib/site-packages/torch/lib/dnnl.lib
+
+# Ignorar archivos del sistema operativo
+.DS_Store
+Thumbs.db
+
+# Ignorar archivos de Python compilados
+*.pyc
+__pycache__/
+
+# Ignorar archivos de configuración local
 .env
