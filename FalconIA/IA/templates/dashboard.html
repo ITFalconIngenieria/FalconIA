@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Falcon IA Dashboard</title>
+    <style>
+        :root {
+            --bg-color: #343541;
+            --sidebar-bg: #202123;
+            --text-color: #ececf1;
+            --accent-color: #19c37d;
+            --hover-color: #2a2b32;
+            --border-color: #4d4d4f;
+        }
+        body, html {
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            height: 100vh;
+            display: flex;
+        }
+        .sidebar {
+            width: 260px;
+            background-color: var(--sidebar-bg);
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+        }
+        .main-content {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+        }
+        .new-chat-btn {
+            background-color: var(--accent-color);
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background-color 0.3s;
+            margin-bottom: 20px;
+        }
+        .new-chat-btn:hover {
+            background-color: #15a367;
+        }
+        .chat-list {
+            list-style-type: none;
+            padding: 0;
+            margin: 0;
+        }
+        .chat-item {
+            background: none;
+            border: none;
+            color: var(--text-color);
+            padding: 10px;
+            margin-bottom: 5px;
+            width: 100%;
+            text-align: left;
+            cursor: pointer;
+            border-radius: 5px;
+            transition: background-color 0.3s;
+        }
+        .chat-item:hover, .chat-item.active {
+            background-color: var(--hover-color);
+        }
+        header {
+            padding: 20px;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        h1 {
+            font-size: 20px;
+            margin: 0;
+        }
+        .header-links a {
+            color: var(--text-color);
+            text-decoration: none;
+            margin-left: 15px;
+            font-size: 14px;
+        }
+        .chat-container {
+            flex-grow: 1;
+            padding: 20px;
+            overflow-y: auto;
+        }
+        .message {
+            max-width: 80%;
+            margin-bottom: 20px;
+            padding: 10px 15px;
+            border-radius: 10px;
+            line-height: 1.5;
+        }
+        .user-message {
+            background-color: #444654;
+            align-self: flex-end;
+            margin-left: auto;
+        }
+        .ai-message {
+            background-color: var(--hover-color);
+            align-self: flex-start;
+        }
+        .message-form {
+            padding: 20px;
+            border-top: 1px solid var(--border-color);
+        }
+        .input-container {
+            display: flex;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        input[type="text"] {
+            flex-grow: 1;
+            padding: 10px 15px;
+            border: 1px solid var(--border-color);
+            border-radius: 5px;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-size: 16px;
+        }
+        button[type="submit"] {
+            background-color: var(--accent-color);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            margin-left: 10px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.3s;
+        }
+        button[type="submit"]:hover {
+            background-color: #15a367;
+        }
+    </style>
+</head>
+<body>
+    <div class="sidebar">
+        <form method="POST">
+            {% csrf_token %}
+            <button type="submit" name="new_chat" class="new-chat-btn">Nueva conversación</button>
+        </form>
+        <ul class="chat-list">
+            {% for chat in chats %}
+            <li>
+                <form method="POST">
+                    {% csrf_token %}
+                    <input type="hidden" name="chat_id" value="{{ chat.id }}">
+                    <button type="submit" class="chat-item {% if chat == current_chat %}active{% endif %}">
+                        {{ chat.title }}
+                    </button>
+                </form>
+            </li>
+            {% endfor %}
+        </ul>
+    </div>
+    <div class="main-content">
+        <header>
+            <h1>Falcon IA - {{ current_chat.title }}</h1>
+            <div class="header-links">
+                <a href="{% url 'upload_document' %}">Cargar documento</a>
+                <a href="{% url 'logout' %}">Cerrar sesión</a>
+            </div>
+        </header>
+        <div class="chat-container">
+            {% for message in messages %}
+                <div class="message {% if message.is_user %}user-message{% else %}ai-message{% endif %}">
+                    <p>{{ message.content }}</p>
+                </div>
+            {% endfor %}
+        </div>
+        <form method="POST" class="message-form">
+            {% csrf_token %}
+            <div class="input-container">
+                <input type="text" name="consulta" placeholder="Escribe tu mensaje aquí..." required>
+                <button type="submit">Enviar</button>
+            </div>
+        </form>
+    </div>
+</body>
+</html>

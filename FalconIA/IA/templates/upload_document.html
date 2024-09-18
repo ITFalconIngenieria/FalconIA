@@ -1,0 +1,166 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Cargar y Gestionar Documentos - Falcon IA{% endblock %}
+
+{% block extra_head %}
+<style>
+    body {
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        line-height: 1.6;
+        margin: 0;
+        padding: 0;
+        background-color: #343541;
+        color: #ececf1;
+    }
+    .container {
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 20px;
+    }
+    header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 20px 0;
+        border-bottom: 1px solid #565869;
+    }
+    h1, h2 {
+        font-size: 24px;
+        font-weight: 600;
+        color: #ececf1;
+    }
+    .upload-container, .document-list {
+        background-color: #444654;
+        border-radius: 8px;
+        padding: 20px;
+        margin-top: 20px;
+    }
+    .file-input-wrapper {
+        position: relative;
+        overflow: hidden;
+        display: inline-block;
+    }
+    .file-input-wrapper input[type=file] {
+        font-size: 100px;
+        position: absolute;
+        left: 0;
+        top: 0;
+        opacity: 0;
+        cursor: pointer;
+    }
+    .btn, button[type="submit"] {
+        background-color: #19c37d;
+        color: white;
+        border: none;
+        padding: 10px 15px;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 16px;
+        transition: background-color 0.3s ease;
+    }
+    .btn:hover, button[type="submit"]:hover {
+        background-color: #15a367;
+    }
+    .file-name {
+        margin-top: 10px;
+        font-style: italic;
+        color: #a9a9b3;
+    }
+    .document-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 15px 0;
+        border-bottom: 1px solid #565869;
+    }
+    .document-item:last-child {
+        border-bottom: none;
+    }
+    .delete-btn {
+        background-color: #e12d39;
+        color: white;
+        border: none;
+        padding: 5px 10px;
+        border-radius: 4px;
+        cursor: pointer;
+        transition: background-color 0.3s ease;
+    }
+    .delete-btn:hover {
+        background-color: #c21f2b;
+    }
+    .messages {
+        list-style-type: none;
+        padding: 0;
+    }
+    .messages li {
+        padding: 10px;
+        margin-bottom: 10px;
+        border-radius: 4px;
+        background-color: #19c37d;
+        color: white;
+    }
+    .back-link {
+        display: inline-block;
+        margin-top: 20px;
+        color: #19c37d;
+        text-decoration: none;
+    }
+    .back-link:hover {
+        text-decoration: underline;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <header>
+        <h1>Cargar y Gestionar Documentos</h1>
+    </header>
+    
+    {% if messages %}
+    <ul class="messages">
+        {% for message in messages %}
+        <li{% if message.tags %} class="{{ message.tags }}"{% endif %}>{{ message }}</li>
+        {% endfor %}
+    </ul>
+    {% endif %}
+    
+    <div class="upload-container">
+        <h2>Cargar Nuevo Documento</h2>
+        <form method="post" enctype="multipart/form-data">
+            {% csrf_token %}
+            <div class="file-input-wrapper">
+                <button class="btn" type="button">Seleccionar archivo</button>
+                <input type="file" name="document" accept=".pdf,.txt,.csv,.doc,.docx" id="file-input">
+            </div>
+            <p class="file-name" id="file-name"></p>
+            <button type="submit">Cargar</button>
+        </form>
+    </div>
+    
+    <div class="document-list">
+        <h2>Documentos Cargados</h2>
+        {% for document in documents %}
+        <div class="document-item">
+            <span>{{ document.file.name }}</span>
+            <form method="post" style="display: inline;">
+                {% csrf_token %}
+                <button type="submit" name="delete" value="{{ document.id }}" class="delete-btn">Eliminar</button>
+            </form>
+        </div>
+        {% empty %}
+        <p>No hay documentos cargados.</p>
+        {% endfor %}
+    </div>
+    
+    <a href="{% url 'dashboard' %}" class="back-link">Volver al Dashboard</a>
+</div>
+
+<script>
+    document.getElementById('file-input').addEventListener('change', function(e) {
+        var fileName = e.target.files[0].name;
+        document.getElementById('file-name').textContent = 'Archivo seleccionado: ' + fileName;
+    });
+</script>
+{% endblock %}
