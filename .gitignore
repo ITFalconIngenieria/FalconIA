@@ -19,3 +19,4 @@ __pycache__/
 
 # Ignorar migraciones de Django o Flask
 */migrations/
+FalconIA/documents/

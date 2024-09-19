@@ -132,7 +132,8 @@
             {% csrf_token %}
             <div class="file-input-wrapper">
                 <button class="btn" type="button">Seleccionar archivo</button>
-                <input type="file" name="document" accept=".pdf,.txt,.csv,.doc,.docx" id="file-input">
+                <input type="file" name="documents" accept=".pdf,.txt,.csv,.doc,.docx" id="file-input" multiple>
+
             </div>
             <p class="file-name" id="file-name"></p>
             <button type="submit">Cargar</button>
@@ -159,8 +160,9 @@
 
 <script>
     document.getElementById('file-input').addEventListener('change', function(e) {
-        var fileName = e.target.files[0].name;
-        document.getElementById('file-name').textContent = 'Archivo seleccionado: ' + fileName;
-    });
+    var fileNames = Array.from(e.target.files).map(file => file.name).join(', ');
+    document.getElementById('file-name').textContent = 'Archivos seleccionados: ' + fileNames;
+});
+
 </script>
 {% endblock %}

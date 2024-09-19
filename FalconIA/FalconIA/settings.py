@@ -27,7 +27,7 @@ OPENAI_API_KEY = config('OPENAI_API_KEY')
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['192.168.128.99']
 
 # Application definition
 
@@ -83,6 +83,7 @@ WSGI_APPLICATION = 'FalconIA.wsgi.application'
 #     }
 # }
 
+DATA_UPLOAD_MAX_NUMBER_FILES = None
 
 DATABASES = {
     'default': {

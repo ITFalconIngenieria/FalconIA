@@ -4,11 +4,9 @@ from django.contrib.auth import login, authenticate
 from django.contrib.auth.forms import UserCreationForm, AuthenticationForm
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
-from .models import Consulta
 from openai import OpenAI
 from .utils import search_similar_documents
 from django.conf import settings
-import traceback
 from .models import Document, Chat, Message
 from .utils import process_document,generate_chat_title
 from django.contrib import messages
@@ -47,38 +45,6 @@ def login_view(request):
         form = AuthenticationForm()
     return render(request, 'login.html', {'form': form})
 
-
-# @login_required
-# def dashboard(request):
-#     chats = Chat.objects.filter(user=request.user).order_by('-updated_at')
-#     current_chat = chats.first()
-    
-#     if request.method == 'POST':
-#         if 'new_chat' in request.POST:
-#             current_chat = Chat.objects.create(user=request.user)
-#         elif 'chat_id' in request.POST:
-#             current_chat = get_object_or_404(Chat, id=request.POST['chat_id'], user=request.user)
-        
-#         if 'consulta' in request.POST:
-#             query = request.POST['consulta']
-#             Message.objects.create(chat=current_chat, is_user=True, content=query)
-            
-#             documents = Document.objects.filter(user=request.user, processed=True)
-#             similar_docs = search_similar_texts(query, documents)
-#             context = "\n".join([doc.content_text for doc in similar_docs])
-            
-#             respuesta = consulta_openai(query, context)
-#             Message.objects.create(chat=current_chat, is_user=False, content=respuesta)
-            
-#             current_chat.save()  # Actualiza el timestamp
-    
-#     messages = current_chat.messages.all() if current_chat else []
-    
-#     return render(request, 'dashboard.html', {
-#         'chats': chats,
-#         'current_chat': current_chat,
-#         'messages': messages,
-#     })
 
 @login_required
 def dashboard(request):
@@ -176,14 +142,22 @@ def update_chat_title(request, chat_id):
         return JsonResponse({'status': 'success', 'new_title': chat.title})
     return JsonResponse({'status': 'error', 'message': 'No title provided'}, status=400)
 
+
 @login_required
 def upload_document(request):
     if request.method == 'POST':
-        if 'document' in request.FILES:
-            file = request.FILES['document']
-            document = Document.objects.create(user=request.user, file=file)
-            process_document(document)
-            messages.success(request, 'Documento cargado y procesado con éxito.')
+        if 'documents' in request.FILES:
+            files = request.FILES.getlist('documents')
+            max_files_per_batch = 50  # Cambia esto al tamaño de lote que desees
+
+            for i in range(0, len(files), max_files_per_batch):
+                batch = files[i:i + max_files_per_batch]
+                for file in batch:
+                    document = Document.objects.create(user=request.user, file=file)
+                    process_document(document)
+                
+                messages.success(request, f'Lote {i // max_files_per_batch + 1} cargado y procesado con éxito.')
+
             return redirect('upload_document')
         elif 'delete' in request.POST:
             doc_id = request.POST.get('delete')
@@ -197,13 +171,16 @@ def upload_document(request):
     return render(request, 'upload_document.html', {'documents': documents})
 
 
+
+
 def consulta_openai(query, context=''):
     client = get_openai_client()
     
     try:
         prompt = f"Contexto: {context}\n\nPregunta: {query}\n\nRespuesta:"
         response = client.chat.completions.create(
-            model="gpt-4",
+            # model="gpt-4",
+            model= "gpt-3.5-turbo",
             messages=[
                 {"role": "system", "content": "Eres un asistente útil. Usa el contexto proporcionado para responder la pregunta si es relevante."},
                 {"role": "user", "content": prompt}
