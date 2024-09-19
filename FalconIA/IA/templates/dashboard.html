@@ -1,3 +1,4 @@
+{% load static %}
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -6,184 +7,325 @@
     <title>Falcon IA Dashboard</title>
     <style>
         :root {
-            --bg-color: #343541;
             --sidebar-bg: #202123;
+            --main-bg: #343541;
             --text-color: #ececf1;
-            --accent-color: #19c37d;
-            --hover-color: #2a2b32;
+            --secondary-text: #9fa2a7;
             --border-color: #4d4d4f;
+            --hover-color: #2A2B32;
+            --input-bg: #40414f;
+            --user-msg-bg: #007bff;
+            --ai-msg-bg: #f0f0f0;
         }
         body, html {
             margin: 0;
             padding: 0;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: var(--bg-color);
-            color: var(--text-color);
+            font-family: 'Söhne', 'Segoe UI', Helvetica, Arial, sans-serif;
             height: 100vh;
+            color: var(--text-color);
+            background-color: var(--main-bg);
+            font-size: 14px;
+        }
+        .app {
             display: flex;
+            height: 100vh;
         }
         .sidebar {
             width: 260px;
             background-color: var(--sidebar-bg);
-            padding: 20px;
             display: flex;
+            width: 50%;
             flex-direction: column;
+            height: 100vh;
             overflow-y: auto;
         }
         .main-content {
             flex-grow: 1;
             display: flex;
             flex-direction: column;
+            height: 100vh;
             overflow-y: auto;
         }
         .new-chat-btn {
-            background-color: var(--accent-color);
-            color: white;
-            border: none;
+            background-color: transparent;
+            border: 1px solid var(--border-color);
+            color: var(--text-color);
             padding: 10px 15px;
-            border-radius: 5px;
+            border-radius: 6px;
             cursor: pointer;
-            font-size: 14px;
+            margin: 10px;
             transition: background-color 0.3s;
-            margin-bottom: 20px;
+            font-size: 14px;
+            text-align: left;
+            display: flex;
+            align-items: center;
         }
         .new-chat-btn:hover {
-            background-color: #15a367;
+            background-color: var(--hover-color);
+        }
+        .new-chat-btn svg {
+            margin-right: 8px;
         }
         .chat-list {
             list-style-type: none;
             padding: 0;
             margin: 0;
+            overflow-y: auto;
         }
         .chat-item {
-            background: none;
-            border: none;
-            color: var(--text-color);
-            padding: 10px;
-            margin-bottom: 5px;
-            width: 100%;
-            text-align: left;
+            padding: 10px 15px;
             cursor: pointer;
-            border-radius: 5px;
             transition: background-color 0.3s;
+            font-size: 14px;
+            color: var(--secondary-text);
+            display: flex;
+            align-items: center;
+            text-decoration: none;
         }
         .chat-item:hover, .chat-item.active {
             background-color: var(--hover-color);
-        }
-        header {
-            padding: 20px;
-            border-bottom: 1px solid var(--border-color);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        h1 {
-            font-size: 20px;
-            margin: 0;
-        }
-        .header-links a {
             color: var(--text-color);
-            text-decoration: none;
-            margin-left: 15px;
-            font-size: 14px;
+        }
+        .chat-icon {
+            margin-right: 10px;
         }
         .chat-container {
             flex-grow: 1;
-            padding: 20px;
             overflow-y: auto;
+            padding: 50px;
+            display: flex;
+            flex-direction: column;
+        }
+        .message-group {
+            display: flex;
+            margin-bottom: 20px;
+        }
+        .message-group.user {
+            justify-content: flex-end;
         }
         .message {
             max-width: 80%;
-            margin-bottom: 20px;
             padding: 10px 15px;
-            border-radius: 10px;
-            line-height: 1.5;
+            border-radius: 18px;
+            line-height: 1.4;
         }
-        .user-message {
-            background-color: #444654;
-            align-self: flex-end;
-            margin-left: auto;
+        .user .message {
+            background-color: var(--user-msg-bg);
+            color: white;
+            border-bottom-right-radius: 4px;
         }
-        .ai-message {
-            background-color: var(--hover-color);
-            align-self: flex-start;
+        .ai .message {
+            background-color: var(--ai-msg-bg);
+            color: black;
+            border-bottom-left-radius: 4px;
         }
-        .message-form {
+        .avatar {
+            width: 30px;
+            height: 30px;
+            border-radius: 4px;
+            margin-right: 10px;
+        }
+        .input-area {
             padding: 20px;
+            background-color: var(--main-bg);
             border-top: 1px solid var(--border-color);
         }
         .input-container {
             display: flex;
-            max-width: 800px;
-            margin: 0 auto;
+            align-items: center;
+            background-color: var(--input-bg);
+            border-radius: 8px;
+            padding: 8px;
         }
-        input[type="text"] {
+        .message-input {
             flex-grow: 1;
-            padding: 10px 15px;
-            border: 1px solid var(--border-color);
-            border-radius: 5px;
-            background-color: var(--bg-color);
-            color: var(--text-color);
-            font-size: 16px;
-        }
-        button[type="submit"] {
-            background-color: var(--accent-color);
-            color: white;
+            background-color: transparent;
             border: none;
-            padding: 10px 20px;
-            margin-left: 10px;
-            border-radius: 5px;
-            cursor: pointer;
-            font-size: 16px;
-            transition: background-color 0.3s;
+            color: var(--text-color);
+            font-size: 14px;
+            padding: 8px;
+            resize: none;
+            height: 20px;
+            max-height: 200px;
+            overflow-y: auto;
         }
-        button[type="submit"]:hover {
-            background-color: #15a367;
+        .message-input:focus {
+            outline: none;
+        }
+        .send-button {
+            background: none;
+            border: none;
+            color: var(--secondary-text);
+            cursor: pointer;
+            padding: 5px;
+        }
+        .send-button svg {
+            width: 20px;
+            height: 20px;
+        }
+        .typing-indicator {
+            padding: 10px 15px;
+            display: flex;
+            align-items: center;
+        }
+        .typing-indicator .dot {
+            width: 8px;
+            height: 8px;
+            background-color: var(--secondary-text);
+            border-radius: 50%;
+            margin-right: 5px;
+            animation: typing 1s infinite ease-in-out;
+        }
+        .typing-indicator .dot:nth-child(2) {
+            animation-delay: 0.2s;
+        }
+        .typing-indicator .dot:nth-child(3) {
+            animation-delay: 0.4s;
+        }
+        @keyframes typing {
+            0% { transform: translateY(0px); }
+            50% { transform: translateY(-5px); }
+            100% { transform: translateY(0px); }
         }
     </style>
 </head>
 <body>
-    <div class="sidebar">
-        <form method="POST">
-            {% csrf_token %}
-            <button type="submit" name="new_chat" class="new-chat-btn">Nueva conversación</button>
-        </form>
-        <ul class="chat-list">
-            {% for chat in chats %}
-            <li>
-                <form method="POST">
-                    {% csrf_token %}
-                    <input type="hidden" name="chat_id" value="{{ chat.id }}">
-                    <button type="submit" class="chat-item {% if chat == current_chat %}active{% endif %}">
+    <div class="app">
+        <aside class="sidebar">
+            <form action="{% url 'new_chat' %}" method="POST">
+                {% csrf_token %}
+                <button type="submit" class="new-chat-btn">
+                    <svg stroke="currentColor" fill="none" stroke-width="2" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round" height="1em" width="1em" xmlns="http://www.w3.org/2000/svg"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                    Nueva conversación
+                </button>
+            </form>
+            <ul class="chat-list">
+                {% for chat in chats %}
+                <li>
+                    <a href="{% url 'dashboard' %}?chat_id={{ chat.id }}" class="chat-item {% if chat == current_chat %}active{% endif %}">
+                        <span class="chat-icon">
+                            <svg stroke="currentColor" fill="none" stroke-width="2" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round" height="1em" width="1em" xmlns="http://www.w3.org/2000/svg"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+                        </span>
                         {{ chat.title }}
+                    </a>
+                </li>
+                {% endfor %}
+            </ul>
+        </aside>
+        <main class="main-content">
+            <div class="chat-container" id="chat-container">
+                {% for message in messages %}
+                    <div class="message-group {% if message.is_user %}user{% else %}ai{% endif %}">
+                        {% if not message.is_user %}
+                            <img src="{% static 'img/falcon.jpg' %}" alt="AI Avatar" class="avatar">
+                        {% endif %}
+                        <div class="message">
+                            {{ message.content }}
+                        </div>
+                        {% if message.is_user %}
+                            <img src="{% static 'img/usuario.png' %}" alt="User Avatar" class="avatar">
+                        {% endif %}
+                    </div>
+                {% endfor %}
+            </div>
+            <form id="chat-form" class="input-area">
+                {% csrf_token %}
+                <div class="input-container">
+                    <textarea id="message-input" name="message" placeholder="Envía un mensaje" class="message-input" rows="1" required></textarea>
+                    <button type="submit" class="send-button">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" height="1em" width="1em">
+                            <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"></path>
+                        </svg>
                     </button>
-                </form>
-            </li>
-            {% endfor %}
-        </ul>
-    </div>
-    <div class="main-content">
-        <header>
-            <h1>Falcon IA - {{ current_chat.title }}</h1>
-            <div class="header-links">
-                <a href="{% url 'upload_document' %}">Cargar documento</a>
-                <a href="{% url 'logout' %}">Cerrar sesión</a>
-            </div>
-        </header>
-        <div class="chat-container">
-            {% for message in messages %}
-                <div class="message {% if message.is_user %}user-message{% else %}ai-message{% endif %}">
-                    <p>{{ message.content }}</p>
                 </div>
-            {% endfor %}
-        </div>
-        <form method="POST" class="message-form">
-            {% csrf_token %}
-            <div class="input-container">
-                <input type="text" name="consulta" placeholder="Escribe tu mensaje aquí..." required>
-                <button type="submit">Enviar</button>
-            </div>
-        </form>
+            </form>
+        </main>
     </div>
+
+    <script>
+        const chatForm = document.getElementById('chat-form');
+        const messageInput = document.getElementById('message-input');
+        const chatContainer = document.getElementById('chat-container');
+        const currentChatId = '{{ current_chat.id }}';
+
+        chatForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            const message = messageInput.value.trim();
+            if (message) {
+                addMessage(message, true);
+                messageInput.value = '';
+                showTypingIndicator();
+
+                fetch('{% url "send_message" %}', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                        'X-CSRFToken': '{{ csrf_token }}'
+                    },
+                    body: new URLSearchParams({
+                        'message': message,
+                        'chat_id': currentChatId
+                    })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    hideTypingIndicator();
+                    addMessage(data.ai_message, false);
+                    updateChatTitle(data.chat_title);
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    hideTypingIndicator();
+                });
+            }
+        });
+
+        function addMessage(content, isUser) {
+            const messageGroup = document.createElement('div');
+            messageGroup.className = `message-group ${isUser ? 'user' : 'ai'}`;
+            messageGroup.innerHTML = `
+                ${!isUser ? `<img src="{% static 'img/falcon.jpg' %}" alt="AI Avatar" class="avatar">` : ''}
+                <div class="message">${content}</div>
+                ${isUser ? `<img src="{% static 'img/usuario.png' %}" alt="User Avatar" class="avatar">` : ''}
+            `;
+            chatContainer.appendChild(messageGroup);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+
+        function showTypingIndicator() {
+            const typingIndicator = document.createElement('div');
+            typingIndicator.className = 'typing-indicator';
+            typingIndicator.innerHTML = `
+                <div class="dot"></div>
+                <div class="dot"></div>
+                <div class="dot"></div>
+            `;
+            chatContainer.appendChild(typingIndicator);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+
+        function hideTypingIndicator() {
+            const typingIndicator = document.querySelector('.typing-indicator');
+            if (typingIndicator) {
+                typingIndicator.remove();
+            }
+        }
+
+        function updateChatTitle(newTitle) {
+            const activeChatItem = document.querySelector('.chat-item.active');
+            if (activeChatItem) {
+                const titleSpan = activeChatItem.querySelector('span:last-child');
+                if (titleSpan) {
+                    titleSpan.textContent = newTitle;
+                }
+            }
+        }
+
+        // Ajustar la altura del textarea
+        messageInput.addEventListener('input', function() {
+            this.style.height = 'auto';
+            this.style.height = (this.scrollHeight) + 'px';
+        });
+    </script>
 </body>
 </html>

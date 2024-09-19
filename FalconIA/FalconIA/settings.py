@@ -87,10 +87,10 @@ WSGI_APPLICATION = 'FalconIA.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'mssql',
-        'NAME': 'IADB',
+        'NAME': 'IAFALCONDB',
         'USER': 'sa',
         'PASSWORD': 'admin1',
-        'HOST': 'localhost',  # O el host de tu servidor SQL
+        'HOST': 'localhost',
         'PORT': '1433',
         'OPTIONS': {
             'driver': 'ODBC Driver 17 for SQL Server',

@@ -6,11 +6,16 @@ from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
 from .models import Consulta
 from openai import OpenAI
+from .utils import search_similar_documents
 from django.conf import settings
 import traceback
 from .models import Document, Chat, Message
-from .utils import process_document, search_similar_texts
+from .utils import process_document,generate_chat_title
 from django.contrib import messages
+from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_POST
+from django.http import JsonResponse
+import json
 def get_openai_client():
     return OpenAI(api_key=settings.OPENAI_API_KEY)
 
@@ -43,31 +48,54 @@ def login_view(request):
     return render(request, 'login.html', {'form': form})
 
 
+# @login_required
+# def dashboard(request):
+#     chats = Chat.objects.filter(user=request.user).order_by('-updated_at')
+#     current_chat = chats.first()
+    
+#     if request.method == 'POST':
+#         if 'new_chat' in request.POST:
+#             current_chat = Chat.objects.create(user=request.user)
+#         elif 'chat_id' in request.POST:
+#             current_chat = get_object_or_404(Chat, id=request.POST['chat_id'], user=request.user)
+        
+#         if 'consulta' in request.POST:
+#             query = request.POST['consulta']
+#             Message.objects.create(chat=current_chat, is_user=True, content=query)
+            
+#             documents = Document.objects.filter(user=request.user, processed=True)
+#             similar_docs = search_similar_texts(query, documents)
+#             context = "\n".join([doc.content_text for doc in similar_docs])
+            
+#             respuesta = consulta_openai(query, context)
+#             Message.objects.create(chat=current_chat, is_user=False, content=respuesta)
+            
+#             current_chat.save()  # Actualiza el timestamp
+    
+#     messages = current_chat.messages.all() if current_chat else []
+    
+#     return render(request, 'dashboard.html', {
+#         'chats': chats,
+#         'current_chat': current_chat,
+#         'messages': messages,
+#     })
+
 @login_required
 def dashboard(request):
     chats = Chat.objects.filter(user=request.user).order_by('-updated_at')
-    current_chat = chats.first()
+    current_chat_id = request.GET.get('chat_id')
     
+    if current_chat_id:
+        current_chat = get_object_or_404(Chat, id=current_chat_id, user=request.user)
+    else:
+        current_chat = chats.first() if chats.exists() else None
+
     if request.method == 'POST':
         if 'new_chat' in request.POST:
-            current_chat = Chat.objects.create(user=request.user)
-        elif 'chat_id' in request.POST:
-            current_chat = get_object_or_404(Chat, id=request.POST['chat_id'], user=request.user)
-        
-        if 'consulta' in request.POST:
-            query = request.POST['consulta']
-            Message.objects.create(chat=current_chat, is_user=True, content=query)
-            
-            documents = Document.objects.filter(user=request.user, processed=True)
-            similar_docs = search_similar_texts(query, documents)
-            context = "\n".join([doc.content_text for doc in similar_docs])
-            
-            respuesta = consulta_openai(query, context)
-            Message.objects.create(chat=current_chat, is_user=False, content=respuesta)
-            
-            current_chat.save()  # Actualiza el timestamp
-    
-    messages = current_chat.messages.all() if current_chat else []
+            current_chat = Chat.objects.create(user=request.user, title="Nueva conversación")
+            return redirect('dashboard')
+
+    messages = Message.objects.filter(chat=current_chat) if current_chat else []
     
     return render(request, 'dashboard.html', {
         'chats': chats,
@@ -76,6 +104,77 @@ def dashboard(request):
     })
 
 
+@require_POST
+@login_required
+def send_message(request):
+    message = request.POST.get('message')
+    chat_id = request.POST.get('chat_id')
+    
+    if not chat_id:
+        chat = Chat.objects.create(user=request.user, title="Nueva conversación")
+    else:
+        try:
+            chat_id = int(chat_id)
+            chat = get_object_or_404(Chat, id=chat_id, user=request.user)
+        except ValueError:
+            chat = Chat.objects.create(user=request.user, title="Nueva conversación")
+    
+    user_message = Message.objects.create(chat=chat, content=message, is_user=True)
+    
+    # Buscar documentos similares
+    similar_docs = search_similar_documents(message, request.user)
+    context = "\n".join([doc.content_text for doc, _ in similar_docs])
+    
+    # Usar el contexto en la consulta a OpenAI
+    ai_response = consulta_openai(message, context)
+    ai_message = Message.objects.create(chat=chat, content=ai_response, is_user=False)
+    
+    if chat.messages.count() <= 2:
+        chat.title = message[:30] + "..." if len(message) > 30 else message
+        chat.save()
+    
+    return JsonResponse({
+        'user_message': user_message.content,
+        'ai_message': ai_message.content,
+        'chat_id': chat.id,
+        'chat_title': chat.title
+    })
+
+@login_required
+def new_chat(request):
+    if request.method == 'POST':
+        new_chat = Chat.objects.create(user=request.user, title="Nueva conversación")
+        return redirect('dashboard')
+    return redirect('dashboard')
+
+@login_required
+def delete_chat(request, chat_id):
+    chat = get_object_or_404(Chat, id=chat_id, user=request.user)
+    chat.delete()
+    return redirect('dashboard')
+
+@login_required
+def rename_chat(request, chat_id):
+    if request.method == 'POST':
+        chat = get_object_or_404(Chat, id=chat_id, user=request.user)
+        new_title = request.POST.get('new_title')
+        if new_title:
+            chat.title = new_title
+            chat.save()
+    return redirect('dashboard')
+
+@csrf_exempt
+@require_POST
+@login_required
+def update_chat_title(request, chat_id):
+    chat = get_object_or_404(Chat, id=chat_id, user=request.user)
+    data = json.loads(request.body)
+    new_title = data.get('title')
+    if new_title:
+        chat.title = new_title
+        chat.save()
+        return JsonResponse({'status': 'success', 'new_title': chat.title})
+    return JsonResponse({'status': 'error', 'message': 'No title provided'}, status=400)
 
 @login_required
 def upload_document(request):
@@ -84,7 +183,7 @@ def upload_document(request):
             file = request.FILES['document']
             document = Document.objects.create(user=request.user, file=file)
             process_document(document)
-            messages.success(request, 'Documento cargado con éxito.')
+            messages.success(request, 'Documento cargado y procesado con éxito.')
             return redirect('upload_document')
         elif 'delete' in request.POST:
             doc_id = request.POST.get('delete')
@@ -102,15 +201,11 @@ def consulta_openai(query, context=''):
     client = get_openai_client()
     
     try:
-        if not context:
-            prompt = f"La consulta es: '{query}'. No tengo información específica sobre esto en mi base de datos local. Por favor, proporciona una respuesta general basada en tu conocimiento, indicando claramente que no tienes información específica sobre Falcon Ingeniería."
-        else:
-            prompt = f"Context: {context}\n\nQuery: {query}\n\nAnswer:"
-        
+        prompt = f"Contexto: {context}\n\nPregunta: {query}\n\nRespuesta:"
         response = client.chat.completions.create(
             model="gpt-4",
             messages=[
-                {"role": "system", "content": "Eres un asistente útil. Usa el contexto proporcionado para responder la consulta si está disponible. Si no hay contexto, proporciona una respuesta general e indica que no tienes información específica."},
+                {"role": "system", "content": "Eres un asistente útil. Usa el contexto proporcionado para responder la pregunta si es relevante."},
                 {"role": "user", "content": prompt}
             ],
             max_tokens=300
@@ -118,5 +213,4 @@ def consulta_openai(query, context=''):
         return response.choices[0].message.content.strip()
     except Exception as e:
         print(f"Error al consultar OpenAI: {str(e)}")
-        print(f"Traceback completo:\n{traceback.format_exc()}")
         return "Lo siento, hubo un error al procesar tu consulta."
