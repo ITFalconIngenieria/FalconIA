@@ -5,15 +5,17 @@ from django.contrib.auth.forms import UserCreationForm, AuthenticationForm
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
 from openai import OpenAI
-from .utils import search_similar_documents
 from django.conf import settings
 from .models import Document, Chat, Message
-from .utils import process_document,generate_chat_title
+from .utils import process_document,generate_chat_title, search_similar_documents
 from django.contrib import messages
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 from django.http import JsonResponse
 import json
+
+import numpy as np
+
 def get_openai_client():
     return OpenAI(api_key=settings.OPENAI_API_KEY)
 
@@ -87,17 +89,25 @@ def send_message(request):
     
     user_message = Message.objects.create(chat=chat, content=message, is_user=True)
     
-    # Buscar documentos similares
     similar_docs = search_similar_documents(message, request.user)
     context = "\n".join([doc.content_text for doc, _ in similar_docs])
     
-    # Usar el contexto en la consulta a OpenAI
-    ai_response = consulta_openai(message, context)
+    conversation_history = [
+        {"role": "user" if msg.is_user else "assistant", "content": msg.content}
+        for msg in chat.messages.all().order_by('created_at')
+    ]
+    
+    ai_response = consulta_openai(message, context, conversation_history)
     ai_message = Message.objects.create(chat=chat, content=ai_response, is_user=False)
     
+    # Generar un nuevo título solo si es una nueva conversación
     if chat.messages.count() <= 2:
-        chat.title = message[:30] + "..." if len(message) > 30 else message
+        chat.title = generate_chat_title(chat)
         chat.save()
+    
+    print(f"User message saved: {user_message.id}")
+    print(f"AI message saved: {ai_message.id}")
+    print(f"Chat ID: {chat.id}, Title: {chat.title}")
     
     return JsonResponse({
         'user_message': user_message.content,
@@ -173,18 +183,27 @@ def upload_document(request):
 
 
 
-def consulta_openai(query, context=''):
+def consulta_openai(query, context='', conversation_history=[]):
     client = get_openai_client()
     
     try:
-        prompt = f"Contexto: {context}\n\nPregunta: {query}\n\nRespuesta:"
+        messages = [
+            {"role": "system", "content": "Eres un asistente útil. Usa el contexto proporcionado para responder la pregunta si es relevante."}
+        ]
+        
+        # Agregar el contexto si existe
+        if context:
+            messages.append({"role": "system", "content": f"Contexto adicional: {context}"})
+        
+        # Agregar el historial de la conversación
+        messages.extend(conversation_history)
+        
+        # Agregar la nueva pregunta del usuario
+        messages.append({"role": "user", "content": query})
+        
         response = client.chat.completions.create(
-            # model="gpt-4",
-            model= "gpt-3.5-turbo",
-            messages=[
-                {"role": "system", "content": "Eres un asistente útil. Usa el contexto proporcionado para responder la pregunta si es relevante."},
-                {"role": "user", "content": prompt}
-            ],
+            model="gpt-3.5-turbo",
+            messages=messages,
             max_tokens=300
         )
         return response.choices[0].message.content.strip()

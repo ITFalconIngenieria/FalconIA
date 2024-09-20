@@ -8,10 +8,15 @@ from sentence_transformers import SentenceTransformer
 from sklearn.metrics.pairwise import cosine_similarity
 from .models import Document
 import numpy as np
+from openai import OpenAI
+from django.conf import settings
 model = SentenceTransformer('all-MiniLM-L6-v2')
 
 def create_embedding(text):
     return model.encode([text])[0]
+
+def get_openai_client():
+    return OpenAI(api_key=settings.OPENAI_API_KEY)
 
 def search_similar_documents(query, user, top_k=3):
     query_embedding = create_embedding(query)
@@ -50,10 +55,27 @@ def process_document(document):
     document.processed = True
     document.save()
 
+def generate_chat_title(chat):
+    messages = chat.messages.order_by('created_at')[:2]  # Obtener los primeros dos mensajes
+    if len(messages) < 2:
+        return "Nueva conversación"
+    
+    user_message = messages[0].content
+    ai_response = messages[1].content
 
-def generate_chat_title(message):
-    # Limita el título a los primeros 30 caracteres del mensaje
-    title = message[:30]
-    if len(message) > 30:
-        title += "..."
-    return title
+    client = get_openai_client()
+    
+    try:
+        response = client.chat.completions.create(
+            model="gpt-3.5-turbo",
+            messages=[
+                {"role": "system", "content": "Genera un título corto y descriptivo para una conversación basado en la pregunta del usuario y la respuesta del AI. El título debe ser conciso, no más de 6 palabras."},
+                {"role": "user", "content": f"Pregunta: {user_message}\nRespuesta: {ai_response}"}
+            ],
+            max_tokens=20
+        )
+        title = response.choices[0].message.content.strip()
+        return title[:50] if len(title) > 50 else title
+    except Exception as e:
+        print(f"Error al generar el título del chat: {str(e)}")
+        return user_message[:30] + "..." if len(user_message) > 30 else user_message
