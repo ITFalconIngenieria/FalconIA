@@ -91,7 +91,7 @@ def send_message(request):
     
     similar_docs = search_similar_documents(message, request.user)
     context = "\n".join([doc.content_text for doc, _ in similar_docs])
-    
+    print(f"\nConsulta del usuario: {message}")
     conversation_history = [
         {"role": "user" if msg.is_user else "assistant", "content": msg.content}
         for msg in chat.messages.all().order_by('created_at')
