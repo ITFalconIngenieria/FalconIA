@@ -281,7 +281,7 @@
         const messageInput = document.getElementById('message-input');
         const chatContainer = document.getElementById('chat-container');
         const currentChatId = '{{ current_chat.id }}';
-
+    
         chatForm.addEventListener('submit', function(e) {
             e.preventDefault();
             const message = messageInput.value.trim();
@@ -289,7 +289,7 @@
                 addMessage(message, true);
                 messageInput.value = '';
                 showTypingIndicator();
-
+    
                 fetch('{% url "send_message" %}', {
                     method: 'POST',
                     headers: {
@@ -313,7 +313,15 @@
                 });
             }
         });
-
+    
+        // Enviar mensaje al presionar Enter
+        messageInput.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' && !e.shiftKey) {  // Detectar Enter y evitar Shift + Enter
+                e.preventDefault();  // Evitar salto de línea
+                chatForm.requestSubmit();  // Enviar el formulario
+            }
+        });
+    
         function addMessage(content, isUser) {
             const messageGroup = document.createElement('div');
             messageGroup.className = `message-group ${isUser ? 'user' : 'ai'}`;
@@ -325,7 +333,7 @@
             chatContainer.appendChild(messageGroup);
             chatContainer.scrollTop = chatContainer.scrollHeight;
         }
-
+    
         function showTypingIndicator() {
             const typingIndicator = document.createElement('div');
             typingIndicator.className = 'typing-indicator';
@@ -337,14 +345,14 @@
             chatContainer.appendChild(typingIndicator);
             chatContainer.scrollTop = chatContainer.scrollHeight;
         }
-
+    
         function hideTypingIndicator() {
             const typingIndicator = document.querySelector('.typing-indicator');
             if (typingIndicator) {
                 typingIndicator.remove();
             }
         }
-
+    
         function updateChatTitle(newTitle) {
             const activeChatItem = document.querySelector('.chat-item.active');
             if (activeChatItem) {
@@ -354,12 +362,13 @@
                 }
             }
         }
-
+    
         // Ajustar la altura del textarea
         messageInput.addEventListener('input', function() {
             this.style.height = 'auto';
             this.style.height = (this.scrollHeight) + 'px';
         });
     </script>
+    
 </body>
 </html>
