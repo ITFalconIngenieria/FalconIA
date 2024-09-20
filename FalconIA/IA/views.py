@@ -202,7 +202,7 @@ def consulta_openai(query, context='', conversation_history=[]):
         messages.append({"role": "user", "content": query})
         
         response = client.chat.completions.create(
-            model="gpt-3.5-turbo",
+            model="gpt-4o",
             messages=messages,
             max_tokens=300
         )

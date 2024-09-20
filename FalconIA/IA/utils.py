@@ -71,7 +71,7 @@ def generate_chat_title(chat):
     
     try:
         response = client.chat.completions.create(
-            model="gpt-3.5-turbo",
+            model="gpt-4o",
             messages=[
                 {"role": "system", "content": "Genera un título corto y descriptivo para una conversación basado en la pregunta del usuario y la respuesta del AI. El título debe ser conciso, no más de 6 palabras."},
                 {"role": "user", "content": f"Pregunta: {user_message}\nRespuesta: {ai_response}"}
