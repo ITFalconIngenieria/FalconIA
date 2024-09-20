@@ -5,7 +5,6 @@ from PyPDF2 import PdfReader
 from docx import Document as DocxDocument
 import csv
 from sentence_transformers import SentenceTransformer
-from sklearn.metrics.pairwise import cosine_similarity
 from .models import Document
 import numpy as np
 from openai import OpenAI
@@ -30,9 +29,14 @@ def search_similar_documents(query, user, top_k=3):
         similarities.append((doc, similarity))
     
     similarities.sort(key=lambda x: x[1], reverse=True)
-    return similarities[:top_k]
-
-
+    top_documents = similarities[:top_k]
+    
+    # Imprimir información sobre los documentos seleccionados
+    print("\nDocumentos seleccionados para la consulta:")
+    for doc, similarity in top_documents:
+        print(f"- {doc.file.name} (Similitud: {similarity:.4f})")
+    
+    return top_documents
 def process_document(document):
     file_path = document.file.path
     _, file_extension = os.path.splitext(file_path)
