@@ -187,6 +187,29 @@
             50% { transform: translateY(-5px); }
             100% { transform: translateY(0px); }
         }
+        .sidebar-footer {
+    margin-top: auto;
+    padding: 10px;
+}
+
+.logout-btn {
+    display: flex;
+    align-items: center;
+    color: var(--secondary-text);
+    text-decoration: none;
+    padding: 10px;
+    border-radius: 5px;
+    transition: background-color 0.3s;
+}
+
+.logout-btn:hover {
+    background-color: var(--hover-color);
+    color: var(--text-color);
+}
+
+.logout-btn svg {
+    margin-right: 10px;
+}
     </style>
 </head>
 <body>
@@ -211,7 +234,18 @@
                 </li>
                 {% endfor %}
             </ul>
+            <div class="sidebar-footer">
+                <a href="{% url 'logout' %}" class="logout-btn">
+                    <svg stroke="currentColor" fill="none" stroke-width="2" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round" height="1em" width="1em" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                        <polyline points="16 17 21 12 16 7"></polyline>
+                        <line x1="21" y1="12" x2="9" y2="12"></line>
+                    </svg>
+                    Cerrar sesión
+                </a>
+            </div>
         </aside>
+       
         <main class="main-content">
             <div class="chat-container" id="chat-container">
                 {% for message in messages %}
