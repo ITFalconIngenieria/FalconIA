@@ -10,7 +10,7 @@ import numpy as np
 from openai import OpenAI
 from django.conf import settings
 model = SentenceTransformer('all-MiniLM-L6-v2')
-
+import re
 def create_embedding(text):
     return model.encode([text])[0]
 
@@ -26,17 +26,58 @@ def search_similar_documents(query, top_k=3):
     for doc in documents:
         doc_embedding = np.frombuffer(doc.embedding, dtype=np.float32)
         similarity = np.dot(query_embedding, doc_embedding) / (np.linalg.norm(query_embedding) * np.linalg.norm(doc_embedding))
+        
+        if doc.product_specs:
+            similarity *= 1.2
+        
         similarities.append((doc, similarity))
     
     similarities.sort(key=lambda x: x[1], reverse=True)
     top_documents = similarities[:top_k]
     
-    print("\nDocumentos seleccionados para la consulta:")
-    for doc, similarity in top_documents:
-        print(f"- {doc.file.name} (Similitud: {similarity:.4f})")
+    context = "\n\n".join([f"Documento: {doc.file.name}\nMarca: {doc.brand}\n{doc.content_text}\nEspecificaciones: {doc.product_specs}" for doc, _ in top_documents])
     
-    return top_documents
+    return context, top_documents
 
+
+def extract_product_specs(content):
+    # Patrones para diferentes formatos de especificaciones
+    patterns = [
+        r"potencia del motor en HP([\s\S]*?)(?=\n\n|\Z)",  # Patrón para Schneider
+        r"Motor Power \(HP\)([\s\S]*?)(?=\n\n|\Z)",  # Ejemplo de patrón para otra marca
+        # Añadir más patrones según sea necesario
+    ]
+    
+    for pattern in patterns:
+        spec_match = re.search(pattern, content)
+        if spec_match:
+            specs = spec_match.group(1)
+            spec_lines = specs.strip().split('\n')
+            structured_specs = []
+            for line in spec_lines:
+                parts = line.split()
+                if len(parts) >= 4:
+                    structured_specs.append({
+                        'hp': parts[0],
+                        'voltage': parts[2] if len(parts) > 2 else 'N/A',
+                        'frequency': parts[5] if len(parts) > 5 else 'N/A',
+                        'phases': ' '.join(parts[6:]) if len(parts) > 6 else 'N/A'
+                    })
+            return structured_specs
+    
+    return None  # Si no se encuentran especificaciones
+
+def detect_brand(content):
+    # Lógica simple para detectar la marca basada en palabras clave
+    if "Schneider" in content:
+        return "Schneider Electric"
+    elif "ABB" in content:
+        return "ABB"
+    elif "Siemens" in content:
+        return "Siemens"
+    # Añadir más detecciones de marca según sea necesario
+    else:
+        return "Unknown"
 
 
 def process_document(document):
@@ -57,7 +98,9 @@ def process_document(document):
         raise ValueError(f"Unsupported file type: {file_extension}")
 
     document.content_text = text
-    document.embedding = create_embedding(text).tobytes()
+    document.product_specs = extract_product_specs(text)
+    document.brand = detect_brand(text)
+    document.embedding = create_embedding(text)
     document.processed = True
     document.save()
 

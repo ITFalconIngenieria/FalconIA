@@ -13,8 +13,8 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 from django.http import JsonResponse
 import json
-
 import numpy as np
+
 
 def get_openai_client():
     return OpenAI(api_key=settings.OPENAI_API_KEY)
@@ -81,33 +81,23 @@ def send_message(request):
     if not chat_id:
         chat = Chat.objects.create(user=request.user, title="Nueva conversación")
     else:
-        try:
-            chat_id = int(chat_id)
-            chat = get_object_or_404(Chat, id=chat_id, user=request.user)
-        except ValueError:
-            chat = Chat.objects.create(user=request.user, title="Nueva conversación")
+        chat = get_object_or_404(Chat, id=chat_id, user=request.user)
     
     user_message = Message.objects.create(chat=chat, content=message, is_user=True)
     
-    similar_docs = search_similar_documents(message)
-    context = "\n".join([doc.content_text for doc, _ in similar_docs])
+    context, similar_docs = search_similar_documents(message)
     print(f"\nConsulta del usuario: {message}")
-    conversation_history = [
-        {"role": "user" if msg.is_user else "assistant", "content": msg.content}
-        for msg in chat.messages.all().order_by('created_at')
-    ]
+    print(f"Contexto generado (primeros 500 caracteres): {context[:500]}...")
+    print(f"Documentos similares encontrados: {len(similar_docs)}")
+    for doc, similarity in similar_docs:
+        print(f"- {doc.file.name} (Similitud: {similarity:.4f})")
     
-    ai_response = consulta_openai(message, context, conversation_history)
+    ai_response = consulta_openai(message, context)
     ai_message = Message.objects.create(chat=chat, content=ai_response, is_user=False)
     
-    # Generar un nuevo título solo si es una nueva conversación
     if chat.messages.count() <= 2:
         chat.title = generate_chat_title(chat)
         chat.save()
-    
-    print(f"User message saved: {user_message.id}")
-    print(f"AI message saved: {ai_message.id}")
-    print(f"Chat ID: {chat.id}, Title: {chat.title}")
     
     return JsonResponse({
         'user_message': user_message.content,
@@ -183,31 +173,23 @@ def upload_document(request):
 
 
 
-def consulta_openai(query, context='', conversation_history=[]):
+def consulta_openai(query, context=''):
     client = get_openai_client()
     
     try:
         messages = [
-            {"role": "system", "content": "Eres un asistente útil. Usa el contexto proporcionado para responder la pregunta si es relevante."}
+            {"role": "system", "content": "Eres un asistente especializado en productos eléctricos. Proporciona respuestas estructuradas y fáciles de leer. Usa formato markdown para mejorar la legibilidad. Incluye títulos, listas y énfasis donde sea apropiado."},
+            {"role": "system", "content": f"Contexto de los documentos:\n\n{context}"},
+            {"role": "user", "content": f"Basándote en la información proporcionada, responde a la siguiente pregunta de manera estructurada y fácil de leer: {query}. Si no hay información específica, proporciona detalles sobre los productos más similares o relevantes, explicando por qué son apropiados."}
         ]
-        
-        # Agregar el contexto si existe
-        if context:
-            messages.append({"role": "system", "content": f"Contexto adicional: {context}"})
-        
-        # Agregar el historial de la conversación
-        messages.extend(conversation_history)
-        
-        # Agregar la nueva pregunta del usuario
-        messages.append({"role": "user", "content": query})
         
         response = client.chat.completions.create(
             model="gpt-4o",
             messages=messages,
-            max_tokens=300
+            max_tokens=300,
+            temperature=0.4
         )
         return response.choices[0].message.content.strip()
     except Exception as e:
         print(f"Error al consultar OpenAI: {str(e)}")
         return "Lo siento, hubo un error al procesar tu consulta."
-
