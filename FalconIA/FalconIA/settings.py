@@ -27,7 +27,7 @@ OPENAI_API_KEY = config('OPENAI_API_KEY')
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ['192.168.128.99']
+ALLOWED_HOSTS = ['192.168.128.99','192.168.1.35']
 
 # Application definition
 

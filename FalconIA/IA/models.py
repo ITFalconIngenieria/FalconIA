@@ -11,13 +11,12 @@ class Consulta(models.Model):
         return f"{self.usuario.username} - {self.consulta[:50]}"
 
 class Document(models.Model):
-    user = models.ForeignKey(User, on_delete=models.CASCADE)
     file = models.FileField(upload_to='documents/')
     content_text = models.TextField(blank=True)
     embedding = models.BinaryField(null=True)
     processed = models.BooleanField(default=False)
     uploaded_at = models.DateTimeField(auto_now_add=True)
-
+    
     def __str__(self):
         return self.file.name
 

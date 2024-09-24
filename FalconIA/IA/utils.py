@@ -17,10 +17,10 @@ def create_embedding(text):
 def get_openai_client():
     return OpenAI(api_key=settings.OPENAI_API_KEY)
 
-def search_similar_documents(query, user, top_k=3):
+def search_similar_documents(query, top_k=3):
     query_embedding = create_embedding(query)
     
-    documents = Document.objects.filter(user=user, processed=True)
+    documents = Document.objects.filter(processed=True)
     
     similarities = []
     for doc in documents:
@@ -31,12 +31,14 @@ def search_similar_documents(query, user, top_k=3):
     similarities.sort(key=lambda x: x[1], reverse=True)
     top_documents = similarities[:top_k]
     
-    # Imprimir información sobre los documentos seleccionados
     print("\nDocumentos seleccionados para la consulta:")
     for doc, similarity in top_documents:
         print(f"- {doc.file.name} (Similitud: {similarity:.4f})")
     
     return top_documents
+
+
+
 def process_document(document):
     file_path = document.file.path
     _, file_extension = os.path.splitext(file_path)

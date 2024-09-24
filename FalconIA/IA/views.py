@@ -89,7 +89,7 @@ def send_message(request):
     
     user_message = Message.objects.create(chat=chat, content=message, is_user=True)
     
-    similar_docs = search_similar_documents(message, request.user)
+    similar_docs = search_similar_documents(message)
     context = "\n".join([doc.content_text for doc, _ in similar_docs])
     print(f"\nConsulta del usuario: {message}")
     conversation_history = [
@@ -158,12 +158,12 @@ def upload_document(request):
     if request.method == 'POST':
         if 'documents' in request.FILES:
             files = request.FILES.getlist('documents')
-            max_files_per_batch = 50  # Cambia esto al tamaño de lote que desees
+            max_files_per_batch = 50
 
             for i in range(0, len(files), max_files_per_batch):
                 batch = files[i:i + max_files_per_batch]
                 for file in batch:
-                    document = Document.objects.create(user=request.user, file=file)
+                    document = Document.objects.create(file=file)
                     process_document(document)
                 
                 messages.success(request, f'Lote {i // max_files_per_batch + 1} cargado y procesado con éxito.')
@@ -171,13 +171,13 @@ def upload_document(request):
             return redirect('upload_document')
         elif 'delete' in request.POST:
             doc_id = request.POST.get('delete')
-            document = get_object_or_404(Document, id=doc_id, user=request.user)
-            document.file.delete()  # Borra el archivo físico
-            document.delete()  # Borra el registro de la base de datos
+            document = get_object_or_404(Document, id=doc_id)
+            document.file.delete()
+            document.delete()
             messages.success(request, 'Documento eliminado con éxito.')
             return redirect('upload_document')
 
-    documents = Document.objects.filter(user=request.user).order_by('-uploaded_at')
+    documents = Document.objects.all().order_by('-uploaded_at')
     return render(request, 'upload_document.html', {'documents': documents})
 
 
@@ -210,3 +210,4 @@ def consulta_openai(query, context='', conversation_history=[]):
     except Exception as e:
         print(f"Error al consultar OpenAI: {str(e)}")
         return "Lo siento, hubo un error al procesar tu consulta."
+
