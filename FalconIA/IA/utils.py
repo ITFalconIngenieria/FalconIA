@@ -54,43 +54,57 @@ def search_similar_documents(query, top_k=3, max_context_length=2000):
     return context, top_documents
 
 def extract_product_specs(content):
-    # Patrones para diferentes formatos de especificaciones
-    patterns = [
-        r"potencia del motor en HP([\s\S]*?)(?=\n\n|\Z)",  # Patrón para Schneider
-        r"Motor Power \(HP\)([\s\S]*?)(?=\n\n|\Z)",  # Ejemplo de patrón para otra marca
-        # Añadir más patrones según sea necesario
-    ]
+    # Añadir espacios para asegurarnos de que los valores están correctamente separados
+    cleaned_content = re.sub(r'(\d)([A-Za-z])', r'\1 \2', content)  # Espacio entre número y letra
+    cleaned_content = re.sub(r'([A-Za-z])(\d)', r'\1 \2', cleaned_content)  # Espacio entre letra y número
+    cleaned_content = re.sub(r'(\d)(\d)', r'\1 \2', cleaned_content)  # Espacio entre números consecutivos
+
+    lines = cleaned_content.splitlines()
     
-    for pattern in patterns:
-        spec_match = re.search(pattern, content)
-        if spec_match:
-            specs = spec_match.group(1)
-            spec_lines = specs.strip().split('\n')
-            structured_specs = []
-            for line in spec_lines:
-                parts = line.split()
-                if len(parts) >= 4:
-                    structured_specs.append({
-                        'hp': parts[0],
-                        'voltage': parts[2] if len(parts) > 2 else 'N/A',
-                        'frequency': parts[5] if len(parts) > 5 else 'N/A',
-                        'phases': ' '.join(parts[6:]) if len(parts) > 6 else 'N/A'
-                    })
-            return structured_specs
+    # Encontrar la línea que contiene los encabezados
+    start_index = 0
+    for i, line in enumerate(lines):
+        if "HP 240V" in line and "GUARDAMOTOR" in line:
+            start_index = i
+            break
     
-    return None  # Si no se encuentran especificaciones
+    if start_index == 0:
+        return None  # No se encontraron los encabezados, retornamos None
+
+    # Obtener los encabezados de la tabla
+    headers = re.split(r'\s{2,}', lines[start_index].strip())
+    
+    structured_specs = []
+    
+    # Procesar las líneas que contienen los datos de la tabla
+    for line in lines[start_index + 1:]:
+        # Separar los valores por espacios múltiples
+        columns = re.split(r'\s{2,}', line.strip())
+        
+        # Verificar que la cantidad de columnas coincida con la cantidad de encabezados
+        if len(columns) == len(headers):
+            entry = dict(zip(headers, columns))
+            structured_specs.append(entry)
+    
+    return structured_specs if structured_specs else None
 
 def detect_brand(content):
-    # Lógica simple para detectar la marca basada en palabras clave
-    if "Schneider" in content:
+    # Convertir el contenido a minúsculas para asegurar que la detección no sea sensible a mayúsculas/minúsculas
+    content_lower = content.lower()
+
+    
+    
+    # Detectar "Schneider" o variaciones de "Schneider Electric"
+    if "schneider" in content_lower:
         return "Schneider Electric"
-    elif "ABB" in content:
+    elif "abb" in content_lower:
         return "ABB"
-    elif "Siemens" in content:
+    elif "siemens" in content_lower:
         return "Siemens"
     # Añadir más detecciones de marca según sea necesario
     else:
         return "Unknown"
+
 
 
 def process_document(document):
@@ -101,6 +115,7 @@ def process_document(document):
         with open(file_path, 'rb') as file:
             reader = PdfReader(file)
             text = ' '.join([page.extract_text() for page in reader.pages])
+            print("Texto extraído del PDF:", text)  # Verificar el texto extraído
     elif file_extension == '.txt':
         with open(file_path, 'r', encoding='utf-8') as file:
             text = file.read()
@@ -111,11 +126,20 @@ def process_document(document):
         raise ValueError(f"Unsupported file type: {file_extension}")
 
     document.content_text = text
-    document.product_specs = extract_product_specs(text)
-    document.brand = detect_brand(text)
+    specs = extract_product_specs(text)
+    
+    # Almacenar los datos extraídos en el modelo de documento
+    if specs:
+        document.product_specs = specs.get("especificaciones", [])
+        document.brand = detect_brand(text)  # Detectar y guardar la marca correctamente
+        document.tipo = specs.get("tipo", "Unknown")
+        document.title = specs.get("titulo", "Unknown")
+        
     document.embedding = create_embedding(text)
     document.processed = True
     document.save()
+
+
 
 def generate_chat_title(chat):
     messages = chat.messages.order_by('created_at')[:2]  # Obtener los primeros dos mensajes
