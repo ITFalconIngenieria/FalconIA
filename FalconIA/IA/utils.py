@@ -7,6 +7,7 @@ import csv
 from sentence_transformers import SentenceTransformer
 from .models import Document
 import numpy as np
+import pandas as pd
 from openai import OpenAI
 from django.conf import settings
 model = SentenceTransformer('all-MiniLM-L6-v2')
@@ -21,37 +22,41 @@ def search_similar_documents(query, top_k=3, max_context_length=2000):
     query_embedding = create_embedding(query)
     
     documents = Document.objects.filter(processed=True)
-    
+
     similarities = []
     for doc in documents:
-        doc_embedding = np.frombuffer(doc.embedding, dtype=np.float32)
-        similarity = np.dot(query_embedding, doc_embedding) / (np.linalg.norm(query_embedding) * np.linalg.norm(doc_embedding))
-        
-        if doc.product_specs:
-            similarity *= 1.2
-        
-        similarities.append((doc, similarity))
+        if doc.embedding:  # Verificar que embedding no sea None
+            doc_embedding = np.frombuffer(doc.embedding, dtype=np.float32)
+            similarity = np.dot(query_embedding, doc_embedding) / (np.linalg.norm(query_embedding) * np.linalg.norm(doc_embedding))
+
+            if doc.product_specs:
+                similarity *= 1.2
+            
+            similarities.append((doc, similarity))
+        else:
+            print(f"El documento {doc.file.name} no tiene un embedding válido.")
     
     similarities.sort(key=lambda x: x[1], reverse=True)
     top_documents = similarities[:top_k]
-    
+
     context = ""
     for doc, _ in top_documents:
         doc_context = (
             f"Documento: {doc.file.name}\n"
             f"Marca: {doc.brand}\n"
-            f"Contenido: {doc.content_text[:300]}...\n"  # Limitamos el contenido a 300 caracteres
-            f"Especificaciones: {str(doc.product_specs)[:200]}...\n\n"  # Limitamos las especificaciones a 200 caracteres
+            f"Contenido: {doc.content_text[:300]}...\n"
+            f"Especificaciones: {str(doc.product_specs)[:200]}...\n\n"
         )
         if len(context) + len(doc_context) > max_context_length:
             break
         context += doc_context
-    
+
     context = context[:max_context_length]
-    
+
     print(f"Contexto generado (longitud: {len(context)}):\n{context[:1000]}...")
     
     return context, top_documents
+
 
 def extract_product_specs(content):
     # Añadir espacios para asegurarnos de que los valores están correctamente separados
@@ -88,22 +93,22 @@ def extract_product_specs(content):
     
     return structured_specs if structured_specs else None
 
-def detect_brand(content):
-    # Convertir el contenido a minúsculas para asegurar que la detección no sea sensible a mayúsculas/minúsculas
-    content_lower = content.lower()
-
+def detect_brand(file_name, sheet_name):
+    # Convertir a minúsculas para evitar problemas de mayúsculas/minúsculas
+    file_name = file_name.lower()
+    sheet_name = sheet_name.lower()
     
-    
-    # Detectar "Schneider" o variaciones de "Schneider Electric"
-    if "schneider" in content_lower:
+    # Detectar la marca basada en el nombre del archivo o la pestaña
+    if "schneider" in file_name or "schneider" in sheet_name:
         return "Schneider Electric"
-    elif "abb" in content_lower:
+    elif "abb" in file_name or "abb" in sheet_name:
         return "ABB"
-    elif "siemens" in content_lower:
+    elif "siemens" in file_name or "siemens" in sheet_name:
         return "Siemens"
-    # Añadir más detecciones de marca según sea necesario
+    # Añadir más marcas según sea necesario
     else:
         return "Unknown"
+
 
 
 
@@ -111,7 +116,46 @@ def process_document(document):
     file_path = document.file.path
     _, file_extension = os.path.splitext(file_path)
 
-    if file_extension == '.pdf':
+    if file_extension == '.xlsx':
+        # Cargar el archivo Excel y obtener el nombre de la primera hoja
+        df = pd.read_excel(file_path, engine='openpyxl', sheet_name=0, header=1)
+        sheet_name = pd.ExcelFile(file_path, engine='openpyxl').sheet_names[0]  # Obtener el nombre de la primera hoja
+
+        # Renombrar las columnas para asegurarnos de que tengan los nombres correctos
+        df.columns = [
+            "HP 240V", "HP 480V", "CORRIENTE 240", "CORRIENTE 480V", 
+            "CONTACTOR", "CONTACTOR BOBINA 110VAC", "CONTACTOR BOBINA 24VDC", 
+            "CONTACTOR BOBINA 240V", "GUARDAMOTOR"
+        ]
+
+        # Limpiar datos en caso de que existan filas o celdas vacías
+        df = df.dropna(how='all')  # Eliminar filas completamente vacías
+
+        # Convertir el DataFrame a una lista de diccionarios
+        structured_specs = df.to_dict(orient='records')
+        print("Especificaciones extraídas del Excel:", structured_specs)  # Verificar las especificaciones extraídas
+
+        # Generar una representación de texto del contenido del Excel
+        text_content = df.to_string(index=False)  # Esto convierte el DataFrame completo a texto
+        
+        # Detectar la marca basada en el nombre del archivo o la pestaña
+        marca = detect_brand(document.file.name, sheet_name)
+        
+        print("Marca detectada:", marca)
+
+        # Guardar los datos procesados en el documento
+        document.content_text = text_content  # Guarda la representación de texto del archivo Excel
+        document.product_specs = structured_specs
+        document.brand = marca
+        
+        # Generar embedding del contenido textual extraído del Excel
+        document.embedding = create_embedding(text_content)
+        document.processed = True
+        document.save()
+        return
+    
+    # Procesamiento de otros tipos de archivos como antes (PDF, TXT, DOCX)
+    elif file_extension == '.pdf':
         with open(file_path, 'rb') as file:
             reader = PdfReader(file)
             text = ' '.join([page.extract_text() for page in reader.pages])
@@ -125,19 +169,19 @@ def process_document(document):
     else:
         raise ValueError(f"Unsupported file type: {file_extension}")
 
+    # Procesar el contenido del archivo no Excel
     document.content_text = text
     specs = extract_product_specs(text)
-    
-    # Almacenar los datos extraídos en el modelo de documento
+    print("Especificaciones extraídas:", specs)
+
     if specs:
-        document.product_specs = specs.get("especificaciones", [])
-        document.brand = detect_brand(text)  # Detectar y guardar la marca correctamente
-        document.tipo = specs.get("tipo", "Unknown")
-        document.title = specs.get("titulo", "Unknown")
-        
+        document.product_specs = specs
+        document.brand = detect_brand(text)
+    
     document.embedding = create_embedding(text)
     document.processed = True
     document.save()
+
 
 
 

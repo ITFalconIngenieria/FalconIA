@@ -172,7 +172,9 @@ def upload_document(request):
 
 
 
-def consulta_openai(query, context='', max_tokens=300):
+
+
+def consulta_openai(query, context='', max_tokens=500):
     client = get_openai_client()
     
     try:
