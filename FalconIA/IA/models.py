@@ -18,7 +18,7 @@ class Document(models.Model):
     uploaded_at = models.DateTimeField(auto_now_add=True)
     product_specs = models.JSONField(null=True, blank=True)  # Cambiado de schneider_specs a product_specs
     brand = models.CharField(max_length=100, blank=True)  # Nuevo campo para la marca
-    
+
     def __str__(self):
         return self.file.name
 
