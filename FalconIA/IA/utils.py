@@ -17,7 +17,7 @@ def create_embedding(text):
 def get_openai_client():
     return OpenAI(api_key=settings.OPENAI_API_KEY)
 
-def search_similar_documents(query, top_k=3):
+def search_similar_documents(query, top_k=3, max_context_length=2000):
     query_embedding = create_embedding(query)
     
     documents = Document.objects.filter(processed=True)
@@ -35,15 +35,21 @@ def search_similar_documents(query, top_k=3):
     similarities.sort(key=lambda x: x[1], reverse=True)
     top_documents = similarities[:top_k]
     
-    context = "\n\n".join([
-        f"Documento: {doc.file.name}\n"
-        f"Marca: {doc.brand}\n"
-        f"Contenido: {doc.content_text[:500]}...\n"  # Limitamos el contenido a 500 caracteres
-        f"Especificaciones: {doc.product_specs}"
-        for doc, _ in top_documents
-    ])
+    context = ""
+    for doc, _ in top_documents:
+        doc_context = (
+            f"Documento: {doc.file.name}\n"
+            f"Marca: {doc.brand}\n"
+            f"Contenido: {doc.content_text[:300]}...\n"  # Limitamos el contenido a 300 caracteres
+            f"Especificaciones: {str(doc.product_specs)[:200]}...\n\n"  # Limitamos las especificaciones a 200 caracteres
+        )
+        if len(context) + len(doc_context) > max_context_length:
+            break
+        context += doc_context
     
-    print(f"Contexto generado:\n{context[:1000]}...")  # Imprimir los primeros 1000 caracteres del contexto
+    context = context[:max_context_length]
+    
+    print(f"Contexto generado (longitud: {len(context)}):\n{context[:1000]}...")
     
     return context, top_documents
 

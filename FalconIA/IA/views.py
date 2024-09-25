@@ -84,14 +84,13 @@ def send_message(request):
     
     user_message = Message.objects.create(chat=chat, content=message, is_user=True)
     
-    context, similar_docs = search_similar_documents(message)
+    context, similar_docs = search_similar_documents(message, top_k=3, max_context_length=2000)
     print(f"\nConsulta del usuario: {message}")
-    print(f"Contexto generado (primeros 500 caracteres): {context[:500]}...")
     print(f"Documentos similares encontrados: {len(similar_docs)}")
     for doc, similarity in similar_docs:
         print(f"- {doc.file.name} (Similitud: {similarity:.4f})")
     
-    ai_response_html = consulta_openai(message, context)
+    ai_response_html = consulta_openai(message, context, max_tokens=500)
     ai_message = Message.objects.create(chat=chat, content=ai_response_html, is_user=False)
     
     if chat.messages.count() <= 2:
@@ -104,6 +103,7 @@ def send_message(request):
         'chat_id': chat.id,
         'chat_title': chat.title
     })
+
 
 @login_required
 def new_chat(request):
@@ -171,20 +171,25 @@ def upload_document(request):
 
 
 
-def consulta_openai(query, context=''):
+
+def consulta_openai(query, context='', max_tokens=300):
     client = get_openai_client()
     
     try:
+        system_message = ("Eres un asistente especializado en productos eléctricos. "
+                          "Proporciona respuestas estructuradas y fáciles de leer. "
+                          "Usa formato markdown para mejorar la legibilidad. "
+                          "Incluye títulos, listas y énfasis donde sea apropiado.")
+        
         messages = [
-            {"role": "system", "content": "Eres un asistente especializado en productos eléctricos. Proporciona respuestas estructuradas y fáciles de leer. Usa formato markdown para mejorar la legibilidad. Incluye títulos, listas y énfasis donde sea apropiado."},
-            {"role": "system", "content": f"Contexto de los documentos:\n\n{context}"},
-            {"role": "user", "content": f"Basándote en la información proporcionada, responde a la siguiente pregunta de manera estructurada y fácil de leer: {query}. Si no hay información específica, proporciona detalles sobre los productos más similares o relevantes, explicando por qué son apropiados."}
+            {"role": "system", "content": system_message},
+            {"role": "user", "content": f"Contexto: {context[:1000]}... (truncado)\n\nPregunta: {query}"}
         ]
         
         response = client.chat.completions.create(
-            model="gpt-3.5-turbo",  # Asegúrate de que este sea el modelo correcto
+            model="gpt-4",
             messages=messages,
-            max_tokens=800,
+            max_tokens=max_tokens,
             temperature=0.4
         )
         markdown_response = response.choices[0].message.content.strip()
