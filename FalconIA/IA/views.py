@@ -14,7 +14,7 @@ from django.views.decorators.http import require_POST
 from django.http import JsonResponse
 import json
 import numpy as np
-
+import markdown
 
 def get_openai_client():
     return OpenAI(api_key=settings.OPENAI_API_KEY)
@@ -71,7 +71,6 @@ def dashboard(request):
         'messages': messages,
     })
 
-
 @require_POST
 @login_required
 def send_message(request):
@@ -92,8 +91,8 @@ def send_message(request):
     for doc, similarity in similar_docs:
         print(f"- {doc.file.name} (Similitud: {similarity:.4f})")
     
-    ai_response = consulta_openai(message, context)
-    ai_message = Message.objects.create(chat=chat, content=ai_response, is_user=False)
+    ai_response_html = consulta_openai(message, context)
+    ai_message = Message.objects.create(chat=chat, content=ai_response_html, is_user=False)
     
     if chat.messages.count() <= 2:
         chat.title = generate_chat_title(chat)
@@ -172,7 +171,6 @@ def upload_document(request):
 
 
 
-
 def consulta_openai(query, context=''):
     client = get_openai_client()
     
@@ -184,12 +182,14 @@ def consulta_openai(query, context=''):
         ]
         
         response = client.chat.completions.create(
-            model="gpt-4o",
+            model="gpt-3.5-turbo",  # Asegúrate de que este sea el modelo correcto
             messages=messages,
-            max_tokens=300,
+            max_tokens=800,
             temperature=0.4
         )
-        return response.choices[0].message.content.strip()
+        markdown_response = response.choices[0].message.content.strip()
+        html_response = markdown.markdown(markdown_response)
+        return html_response
     except Exception as e:
         print(f"Error al consultar OpenAI: {str(e)}")
         return "Lo siento, hubo un error al procesar tu consulta."

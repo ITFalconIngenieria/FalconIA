@@ -35,10 +35,17 @@ def search_similar_documents(query, top_k=3):
     similarities.sort(key=lambda x: x[1], reverse=True)
     top_documents = similarities[:top_k]
     
-    context = "\n\n".join([f"Documento: {doc.file.name}\nMarca: {doc.brand}\n{doc.content_text}\nEspecificaciones: {doc.product_specs}" for doc, _ in top_documents])
+    context = "\n\n".join([
+        f"Documento: {doc.file.name}\n"
+        f"Marca: {doc.brand}\n"
+        f"Contenido: {doc.content_text[:500]}...\n"  # Limitamos el contenido a 500 caracteres
+        f"Especificaciones: {doc.product_specs}"
+        for doc, _ in top_documents
+    ])
+    
+    print(f"Contexto generado:\n{context[:1000]}...")  # Imprimir los primeros 1000 caracteres del contexto
     
     return context, top_documents
-
 
 def extract_product_specs(content):
     # Patrones para diferentes formatos de especificaciones
@@ -116,7 +123,7 @@ def generate_chat_title(chat):
     
     try:
         response = client.chat.completions.create(
-            model="gpt-4o",
+            model="gpt-3.5-turbo",
             messages=[
                 {"role": "system", "content": "Genera un título corto y descriptivo para una conversación basado en la pregunta del usuario y la respuesta del AI. El título debe ser conciso, no más de 6 palabras."},
                 {"role": "user", "content": f"Pregunta: {user_message}\nRespuesta: {ai_response}"}

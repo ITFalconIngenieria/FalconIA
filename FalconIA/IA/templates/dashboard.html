@@ -210,6 +210,55 @@
 .logout-btn svg {
     margin-right: 10px;
 }
+.markdown-body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+    font-size: 16px;
+    line-height: 1.5;
+    word-wrap: break-word;
+}
+
+.markdown-body h1 {
+    font-size: 2em;
+    border-bottom: 1px solid #eaecef;
+    padding-bottom: .3em;
+}
+
+.markdown-body h2 {
+    font-size: 1.5em;
+    border-bottom: 1px solid #eaecef;
+    padding-bottom: .3em;
+}
+
+.markdown-body h3 {
+    font-size: 1.25em;
+}
+
+.markdown-body ul, .markdown-body ol {
+    padding-left: 2em;
+}
+
+.markdown-body code {
+    background-color: rgba(27,31,35,.05);
+    border-radius: 3px;
+    font-size: 85%;
+    margin: 0;
+    padding: .2em .4em;
+}
+
+.markdown-body pre {
+    background-color: #f6f8fa;
+    border-radius: 3px;
+    font-size: 85%;
+    line-height: 1.45;
+    overflow: auto;
+    padding: 16px;
+}
+
+.markdown-body blockquote {
+    border-left: .25em solid #dfe2e5;
+    color: #6a737d;
+    padding: 0 1em;
+}
     </style>
 </head>
 <body>
@@ -249,18 +298,22 @@
         <main class="main-content">
             <div class="chat-container" id="chat-container">
                 {% for message in messages %}
-                    <div class="message-group {% if message.is_user %}user{% else %}ai{% endif %}">
-                        {% if not message.is_user %}
-                            <img src="{% static 'img/falcon.jpg' %}" alt="AI Avatar" class="avatar">
-                        {% endif %}
-                        <div class="message">
-                            {{ message.content }}
-                        </div>
-                        {% if message.is_user %}
-                            <img src="{% static 'img/usuario.png' %}" alt="User Avatar" class="avatar">
-                        {% endif %}
-                    </div>
-                {% endfor %}
+<div class="message-group {% if message.is_user %}user{% else %}ai{% endif %}">
+    {% if not message.is_user %}
+        <img src="{% static 'img/falcon.jpg' %}" alt="AI Avatar" class="avatar">
+    {% endif %}
+    <div class="message {% if not message.is_user %}markdown-body{% endif %}">
+        {% if message.is_user %}
+            {{ message.content }}
+        {% else %}
+            {{ message.content|safe }}
+        {% endif %}
+    </div>
+    {% if message.is_user %}
+        <img src="{% static 'img/usuario.png' %}" alt="User Avatar" class="avatar">
+    {% endif %}
+</div>
+{% endfor %}
             </div>
             <form id="chat-form" class="input-area">
                 {% csrf_token %}
