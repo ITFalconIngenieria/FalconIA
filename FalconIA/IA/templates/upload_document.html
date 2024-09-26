@@ -4,42 +4,61 @@
 {% block title %}Cargar y Gestionar Documentos - Falcon IA{% endblock %}
 
 {% block extra_head %}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
 <style>
     body {
-        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        line-height: 1.6;
+        font-family: 'Poppins', sans-serif;
+        background-color: #1f1f2e;
+        color: #f5f5fa;
         margin: 0;
         padding: 0;
-        background-color: #343541;
-        color: #ececf1;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        min-height: 100vh;
     }
     .container {
-        max-width: 800px;
-        margin: 0 auto;
-        padding: 20px;
+        max-width: 900px;
+        width: 100%;
+        background-color: #2b2c3b;
+        padding: 30px;
+        border-radius: 10px;
+        box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
     }
     header {
         display: flex;
         justify-content: space-between;
         align-items: center;
-        padding: 20px 0;
-        border-bottom: 1px solid #565869;
+        border-bottom: 1px solid #3a3b52;
+        padding-bottom: 15px;
+        margin-bottom: 20px;
     }
-    h1, h2 {
-        font-size: 24px;
+    h1 {
+        font-size: 28px;
         font-weight: 600;
-        color: #ececf1;
+        color: #19c37d;
+    }
+    h2 {
+        font-size: 22px;
+        font-weight: 500;
+        margin-bottom: 10px;
+        color: #19c37d;
     }
     .upload-container, .document-list {
-        background-color: #444654;
-        border-radius: 8px;
+        background-color: #3b3c4f;
         padding: 20px;
-        margin-top: 20px;
+        border-radius: 10px;
+        margin-bottom: 20px;
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
+    }
+    .upload-container:hover, .document-list:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
     }
     .file-input-wrapper {
+        display: inline-block;
         position: relative;
         overflow: hidden;
-        display: inline-block;
     }
     .file-input-wrapper input[type=file] {
         font-size: 100px;
@@ -50,17 +69,18 @@
         cursor: pointer;
     }
     .btn, button[type="submit"] {
-        background-color: #19c37d;
-        color: white;
-        border: none;
+        background: linear-gradient(135deg, #19c37d, #14a667);
+        color: #fff;
         padding: 10px 15px;
-        border-radius: 4px;
-        cursor: pointer;
+        border-radius: 5px;
+        border: none;
         font-size: 16px;
-        transition: background-color 0.3s ease;
+        cursor: pointer;
+        transition: background 0.3s, transform 0.3s;
     }
     .btn:hover, button[type="submit"]:hover {
-        background-color: #15a367;
+        background: linear-gradient(135deg, #14a667, #0f8b56);
+        transform: translateY(-2px);
     }
     .file-name {
         margin-top: 10px;
@@ -71,14 +91,14 @@
         display: flex;
         justify-content: space-between;
         align-items: center;
-        padding: 15px 0;
-        border-bottom: 1px solid #565869;
+        padding: 10px 0;
+        border-bottom: 1px solid #4c4d62;
     }
     .document-item:last-child {
         border-bottom: none;
     }
     .delete-btn {
-        background-color: #e12d39;
+        background-color: #ff5c5c;
         color: white;
         border: none;
         padding: 5px 10px;
@@ -87,27 +107,48 @@
         transition: background-color 0.3s ease;
     }
     .delete-btn:hover {
-        background-color: #c21f2b;
+        background-color: #d9534f;
     }
     .messages {
-        list-style-type: none;
+        list-style: none;
         padding: 0;
+        margin-bottom: 20px;
     }
     .messages li {
         padding: 10px;
         margin-bottom: 10px;
-        border-radius: 4px;
-        background-color: #19c37d;
+        background: #19c37d;
         color: white;
+        border-radius: 5px;
+        display: flex;
+        align-items: center;
+    }
+    .messages li i {
+        margin-right: 8px;
     }
     .back-link {
         display: inline-block;
         margin-top: 20px;
         color: #19c37d;
         text-decoration: none;
+        font-weight: 500;
     }
     .back-link:hover {
         text-decoration: underline;
+    }
+    .spinner {
+        display: none;
+        border: 4px solid rgba(255, 255, 255, 0.3);
+        border-radius: 50%;
+        border-top: 4px solid #19c37d;
+        width: 30px;
+        height: 30px;
+        animation: spin 0.8s linear infinite;
+        margin: 10px auto;
+    }
+    @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
     }
 </style>
 {% endblock %}
@@ -115,39 +156,39 @@
 {% block content %}
 <div class="container">
     <header>
-        <h1>Cargar y Gestionar Documentos</h1>
+        <h1><i class="fas fa-upload"></i> Cargar y Gestionar Documentos</h1>
     </header>
     
     {% if messages %}
     <ul class="messages">
         {% for message in messages %}
-        <li{% if message.tags %} class="{{ message.tags }}"{% endif %}>{{ message }}</li>
+        <li{% if message.tags %} class="{{ message.tags }}"{% endif %}><i class="fas fa-info-circle"></i> {{ message }}</li>
         {% endfor %}
     </ul>
     {% endif %}
     
     <div class="upload-container">
-        <h2>Cargar Nuevo Documento</h2>
+        <h2><i class="fas fa-file-upload"></i> Cargar Nuevo Documento</h2>
         <form method="post" enctype="multipart/form-data">
             {% csrf_token %}
             <div class="file-input-wrapper">
-                <button class="btn" type="button">Seleccionar archivo</button>
+                <button class="btn" type="button"><i class="fas fa-folder-open"></i> Seleccionar archivo</button>
                 <input type="file" name="documents" accept=".pdf,.txt,.csv,.doc,.docx" id="file-input" multiple>
-
             </div>
-            <p class="file-name" id="file-name"></p>
-            <button type="submit">Cargar</button>
+            <p class="file-name" id="file-name">No se ha seleccionado ningún archivo</p>
+            <div class="spinner" id="loading-spinner"></div>
+            <button type="submit"><i class="fas fa-cloud-upload-alt"></i> Cargar</button>
         </form>
     </div>
     
     <div class="document-list">
-        <h2>Documentos Cargados</h2>
+        <h2><i class="fas fa-file-alt"></i> Documentos Cargados</h2>
         {% for document in documents %}
         <div class="document-item">
-            <span>{{ document.file.name }}</span>
+            <span><i class="fas fa-file"></i> {{ document.file.name }}</span>
             <form method="post" style="display: inline;">
                 {% csrf_token %}
-                <button type="submit" name="delete" value="{{ document.id }}" class="delete-btn">Eliminar</button>
+                <button type="submit" name="delete" value="{{ document.id }}" class="delete-btn"><i class="fas fa-trash-alt"></i> Eliminar</button>
             </form>
         </div>
         {% empty %}
@@ -155,14 +196,26 @@
         {% endfor %}
     </div>
     
-    <a href="{% url 'dashboard' %}" class="back-link">Volver al Dashboard</a>
+    <a href="{% url 'dashboard' %}" class="back-link"><i class="fas fa-arrow-left"></i> Volver al Dashboard</a>
 </div>
 
 <script>
     document.getElementById('file-input').addEventListener('change', function(e) {
-    var fileNames = Array.from(e.target.files).map(file => file.name).join(', ');
-    document.getElementById('file-name').textContent = 'Archivos seleccionados: ' + fileNames;
-});
+        var fileNames = Array.from(e.target.files).map(file => file.name).join(', ');
+        document.getElementById('file-name').textContent = 'Archivos seleccionados: ' + fileNames;
+    });
 
+    document.querySelector('form').addEventListener('submit', function () {
+        document.getElementById('loading-spinner').style.display = 'block';
+    });
+
+    document.querySelectorAll('.delete-btn').forEach(button => {
+        button.addEventListener('click', function (event) {
+            event.preventDefault();
+            if (confirm('¿Seguro que deseas eliminar este documento?')) {
+                this.closest('form').submit();
+            }
+        });
+    });
 </script>
 {% endblock %}
