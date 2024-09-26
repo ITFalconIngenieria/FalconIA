@@ -3,7 +3,6 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth import login, authenticate
 from django.contrib.auth.forms import UserCreationForm, AuthenticationForm
 from django.contrib.auth.decorators import login_required
-from django.contrib.auth.models import User
 from openai import OpenAI
 from django.conf import settings
 from .models import Document, Chat, Message
@@ -13,7 +12,6 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 from django.http import JsonResponse
 import json
-import numpy as np
 import markdown
 
 def get_openai_client():
@@ -71,6 +69,7 @@ def dashboard(request):
         'messages': messages,
     })
 
+
 @require_POST
 @login_required
 def send_message(request):
@@ -84,7 +83,6 @@ def send_message(request):
     
     user_message = Message.objects.create(chat=chat, content=message, is_user=True)
     
-    # Obtener los últimos mensajes de la conversación para proporcionar contexto
     conversation_history = Message.objects.filter(chat=chat).order_by('-created_at')[:5][::-1]
     conversation_context = "\n".join([f"{'Usuario' if msg.is_user else 'AI'}: {msg.content}" for msg in conversation_history])
     
@@ -175,30 +173,41 @@ def upload_document(request):
     return render(request, 'upload_document.html', {'documents': documents})
 
 
-
-
-
-
 def consulta_openai(query, context='', conversation_context='', max_tokens=500):
     client = get_openai_client()
     
     try:
-        system_message = ("Eres un asistente especializado en productos eléctricos de Schneider Electric, ABB, SIEMENES. "
-                          "Proporciona respuestas precisas basadas en la información de las especificaciones proporcionadas y el contexto de la conversación. "
-                          "Si no encuentras la información exacta, sugiere la opción más cercana y explica por qué. "
-                          "Mantén la coherencia con preguntas anteriores y asume que las preguntas de seguimiento se refieren al mismo contexto a menos que se especifique lo contrario. "
-                          "Usa formato markdown para mejorar la legibilidad.")
+        system_message = (
+            "Eres un asistente especializado en productos eléctricos de Schneider Electric. "
+            "Tu tarea es recomendar el contactor más adecuado y su guardamotor correspondiente basado en las especificaciones proporcionadas por el usuario. "
+            "Prioriza las coincidencias exactas o más cercanas de HP y voltaje. "
+            "Si no hay una coincidencia exacta, sugiere la opción más cercana y explica por qué. "
+            "Considera que 460V es equivalente a 480V en este contexto. "
+            "Siempre incluye tanto el contactor como el guardamotor en tu recomendación. "
+            "Usa formato Markdown para estructurar tu respuesta."
+        )
+        
+        user_message = (
+            f"Contexto de la conversación:\n{conversation_context}\n\n"
+            f"Especificaciones de productos:\n{context}\n\n"
+            f"Pregunta del usuario: {query}\n\n"
+            "Por favor, proporciona la recomendación más precisa basada en las especificaciones dadas. "
+            "Asegúrate de verificar el HP, el voltaje y la tensión de control. "
+            "Incluye siempre tanto el contactor recomendado como su guardamotor correspondiente. "
+            "Si recomiendas productos que no coinciden exactamente, explica por qué son las mejores opciones disponibles "
+            "y menciona cualquier alternativa que pueda ser relevante."
+        )
         
         messages = [
             {"role": "system", "content": system_message},
-            {"role": "user", "content": f"Contexto de la conversación:\n{conversation_context}\n\nEspecificaciones de productos:\n{context}\n\nPregunta del usuario: {query}"}
+            {"role": "user", "content": user_message}
         ]
         
         response = client.chat.completions.create(
             model="gpt-4",
             messages=messages,
             max_tokens=max_tokens,
-            temperature=0.4
+            temperature=0.2
         )
         markdown_response = response.choices[0].message.content.strip()
         html_response = markdown.markdown(markdown_response)

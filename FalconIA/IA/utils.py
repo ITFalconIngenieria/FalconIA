@@ -10,9 +10,11 @@ import numpy as np
 import pandas as pd
 from openai import OpenAI
 from django.conf import settings
-model = SentenceTransformer('all-MiniLM-L6-v2')
 import re
 import json
+
+model = SentenceTransformer('all-MiniLM-L6-v2')
+
 def create_embedding(text):
     return model.encode([text])[0]
 
@@ -22,7 +24,7 @@ def get_openai_client():
 def search_similar_documents(query, conversation_context, top_k=3, max_context_length=2000):
     documents = Document.objects.filter(processed=True)
     
-    context_info = extract_context_info(conversation_context)
+    context_info = extract_context_info(query, conversation_context)
     print(f"Información extraída del contexto: {context_info}")
     
     relevant_specs = []
@@ -33,7 +35,7 @@ def search_similar_documents(query, conversation_context, top_k=3, max_context_l
                 relevance_score = calculate_relevance(query, spec, context_info)
                 if relevance_score > 0:
                     relevant_specs.append((spec, relevance_score))
-                    print(f"Especificación relevante encontrada: {spec['CONTACTOR']} con puntuación {relevance_score}")
+                    print(f"Especificación relevante encontrada: {spec.get('CONTACTOR', 'N/A')} con puntuación {relevance_score}")
     
     relevant_specs.sort(key=lambda x: x[1], reverse=True)
     top_specs = relevant_specs[:top_k]
@@ -54,70 +56,114 @@ def search_similar_documents(query, conversation_context, top_k=3, max_context_l
     
     return context, top_specs
 
-def extract_context_info(conversation_context):
+def extract_context_info(query, conversation_context):
     context_info = {}
     
-    hp_match = re.search(r'(\d+)\s*Hp', conversation_context, re.IGNORECASE)
-    if hp_match:
-        context_info['hp'] = int(hp_match.group(1))
+    # Extraer información de la consulta actual
+    context_info['hp'] = extract_number(query, 'hp')
+    context_info['voltage'] = extract_number(query, 'v')
+    context_info['control_voltage'] = extract_number(query, 'tension de control')
     
-    voltage_match = re.search(r'(\d+)V', conversation_context, re.IGNORECASE)
-    if voltage_match:
-        context_info['voltage'] = int(voltage_match.group(1))
-    
-    current_match = re.search(r'(\d+)\s*A', conversation_context, re.IGNORECASE)
-    if current_match:
-        context_info['current'] = int(current_match.group(1))
+    # Si falta información, buscar en el contexto de la conversación
+    if not context_info['hp']:
+        context_info['hp'] = extract_number(conversation_context, 'hp')
+    if not context_info['voltage']:
+        context_info['voltage'] = extract_number(conversation_context, 'v')
+    if not context_info['control_voltage']:
+        context_info['control_voltage'] = extract_number(conversation_context, 'tension de control')
     
     return context_info
+
+# def calculate_relevance(query, spec, context_info):
+#     relevance = 0
+    
+#     hp = context_info.get('hp') or extract_number(query, 'hp')
+#     voltage = context_info.get('voltage') or extract_number(query, 'v')
+#     current = context_info.get('current') or extract_number(query, 'a')
+    
+#     def safe_float(value):
+#         try:
+#             return float(value)
+#         except (ValueError, TypeError):
+#             return None
+
+#     if hp and 'HP 480V' in spec:
+#         spec_hp = safe_float(spec['HP 480V'])
+#         if spec_hp is not None and abs(spec_hp - hp) <= 5:
+#             relevance += 1
+    
+#     if voltage:
+#         if 200 <= voltage <= 280 and 'CORRIENTE 240' in spec:
+#             relevance += 1
+#         elif 380 <= voltage <= 500 and 'CORRIENTE 480V' in spec:
+#             relevance += 1
+    
+#     if current:
+#         if 'CORRIENTE 240' in spec:
+#             spec_current = safe_float(spec['CORRIENTE 240'])
+#             if spec_current is not None and abs(spec_current - current) <= 5:
+#                 relevance += 1
+#         elif 'CORRIENTE 480V' in spec:
+#             spec_current = safe_float(spec['CORRIENTE 480V'])
+#             if spec_current is not None and abs(spec_current - current) <= 5:
+#                 relevance += 1
+    
+#     if '110v' in query.lower() and 'CONTACTOR BOBINA 110VAC' in spec:
+#         relevance += 1
+#     elif '24v' in query.lower() and 'CONTACTOR BOBINA 24VDC' in spec:
+#         relevance += 1
+#     elif '240v' in query.lower() and 'CONTACTOR BOBINA 240V' in spec:
+#         relevance += 1
+    
+#     return relevance
+
+# def extract_number(text, unit):
+#     match = re.search(rf'(\d+)\s*{unit}', text, re.IGNORECASE)
+#     return int(match.group(1)) if match else None
+
 
 def calculate_relevance(query, spec, context_info):
     relevance = 0
     
-    hp = context_info.get('hp') or extract_number(query, 'hp')
-    voltage = context_info.get('voltage') or extract_number(query, 'v')
-    current = context_info.get('current') or extract_number(query, 'a')
+    hp = context_info.get('hp')
+    voltage = context_info.get('voltage')
+    control_voltage = context_info.get('control_voltage')
     
     def safe_float(value):
         try:
-            return float(value)
+            return float(value) if value is not None else None
         except (ValueError, TypeError):
             return None
 
-    if hp and 'HP 480V' in spec:
-        spec_hp = safe_float(spec['HP 480V'])
-        if spec_hp is not None and abs(spec_hp - hp) <= 5:
-            relevance += 1
-    
-    if voltage:
-        if 200 <= voltage <= 280 and 'CORRIENTE 240' in spec:
-            relevance += 1
-        elif 380 <= voltage <= 500 and 'CORRIENTE 480V' in spec:
-            relevance += 1
-    
-    if current:
-        if 'CORRIENTE 240' in spec:
-            spec_current = safe_float(spec['CORRIENTE 240'])
-            if spec_current is not None and abs(spec_current - current) <= 5:
-                relevance += 1
-        elif 'CORRIENTE 480V' in spec:
-            spec_current = safe_float(spec['CORRIENTE 480V'])
-            if spec_current is not None and abs(spec_current - current) <= 5:
-                relevance += 1
-    
-    if '110v' in query.lower() and 'CONTACTOR BOBINA 110VAC' in spec:
-        relevance += 1
-    elif '24v' in query.lower() and 'CONTACTOR BOBINA 24VDC' in spec:
-        relevance += 1
-    elif '240v' in query.lower() and 'CONTACTOR BOBINA 240V' in spec:
-        relevance += 1
-    
+    # Coincidencia de HP y voltaje
+    if hp is not None and voltage is not None:
+        hp_key = 'HP 480V' if 380 <= voltage <= 500 else 'HP 240V'
+        spec_hp = safe_float(spec.get(hp_key))
+        if spec_hp is not None:
+            hp_diff = abs(spec_hp - hp)
+            if hp_diff == 0:
+                relevance += 100  # Coincidencia exacta
+            elif hp_diff <= 5:
+                relevance += max(0, 100 - hp_diff * 10)  # Relevancia decreciente
+
+    # Coincidencia de tensión de control
+    if control_voltage is not None:
+        control_key = f"CONTACTOR BOBINA {control_voltage}VAC"
+        if control_key in spec:
+            relevance += 50
+        elif f"CONTACTOR BOBINA {control_voltage}VDC" in spec:
+            relevance += 40
+
+    # Consideración del guardamotor
+    if 'GUARDAMOTOR' in spec:
+        relevance += 10  # Damos un poco de relevancia adicional si se incluye el guardamotor
+
     return relevance
 
-def extract_number(text, unit):
-    match = re.search(rf'(\d+)\s*{unit}', text, re.IGNORECASE)
-    return int(match.group(1)) if match else None
 
+def extract_number(text, key):
+    match = re.search(rf'(\d+(?:\.\d+)?)\s*{key}', text, re.IGNORECASE)
+    return float(match.group(1)) if match else None
 
 
 def extract_product_specs(content):
@@ -129,7 +175,7 @@ def extract_product_specs(content):
     lines = cleaned_content.splitlines()
     
     # Encontrar la línea que contiene los encabezados
-    start_index = 0
+    start_index = 0 
     for i, line in enumerate(lines):
         if "HP 240V" in line and "GUARDAMOTOR" in line:
             start_index = i
@@ -264,7 +310,7 @@ def generate_chat_title(chat):
                 {"role": "system", "content": "Genera un título corto y descriptivo para una conversación basado en la pregunta del usuario y la respuesta del AI. El título debe ser conciso, no más de 6 palabras."},
                 {"role": "user", "content": f"Pregunta: {user_message}\nRespuesta: {ai_response}"}
             ],
-            max_tokens=20
+            max_tokens=10
         )
         title = response.choices[0].message.content.strip()
         return title[:50] if len(title) > 50 else title
