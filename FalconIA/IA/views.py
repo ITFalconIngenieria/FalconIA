@@ -84,13 +84,18 @@ def send_message(request):
     
     user_message = Message.objects.create(chat=chat, content=message, is_user=True)
     
-    context, similar_docs = search_similar_documents(message, top_k=3, max_context_length=2000)
-    print(f"\nConsulta del usuario: {message}")
-    print(f"Documentos similares encontrados: {len(similar_docs)}")
-    for doc, similarity in similar_docs:
-        print(f"- {doc.file.name} (Similitud: {similarity:.4f})")
+    # Obtener los últimos mensajes de la conversación para proporcionar contexto
+    conversation_history = Message.objects.filter(chat=chat).order_by('-created_at')[:5][::-1]
+    conversation_context = "\n".join([f"{'Usuario' if msg.is_user else 'AI'}: {msg.content}" for msg in conversation_history])
     
-    ai_response_html = consulta_openai(message, context, max_tokens=500)
+    context, similar_specs = search_similar_documents(message, conversation_context, top_k=3, max_context_length=2000)
+    print(f"\nConsulta del usuario: {message}")
+    print(f"Contexto de la conversación:\n{conversation_context}")
+    print(f"Especificaciones similares encontradas: {len(similar_specs)}")
+    for spec, similarity in similar_specs:
+        print(f"- Contactor: {spec.get('CONTACTOR', 'N/A')} (Similitud: {similarity:.4f})")
+    
+    ai_response_html = consulta_openai(message, context, conversation_context, max_tokens=500)
     ai_message = Message.objects.create(chat=chat, content=ai_response_html, is_user=False)
     
     if chat.messages.count() <= 2:
@@ -174,18 +179,19 @@ def upload_document(request):
 
 
 
-def consulta_openai(query, context='', max_tokens=500):
+def consulta_openai(query, context='', conversation_context='', max_tokens=500):
     client = get_openai_client()
     
     try:
-        system_message = ("Eres un asistente especializado en productos eléctricos. "
-                          "Proporciona respuestas estructuradas y fáciles de leer. "
-                          "Usa formato markdown para mejorar la legibilidad. "
-                          "Incluye títulos, listas y énfasis donde sea apropiado.")
+        system_message = ("Eres un asistente especializado en productos eléctricos de Schneider Electric, ABB, SIEMENES. "
+                          "Proporciona respuestas precisas basadas en la información de las especificaciones proporcionadas y el contexto de la conversación. "
+                          "Si no encuentras la información exacta, sugiere la opción más cercana y explica por qué. "
+                          "Mantén la coherencia con preguntas anteriores y asume que las preguntas de seguimiento se refieren al mismo contexto a menos que se especifique lo contrario. "
+                          "Usa formato markdown para mejorar la legibilidad.")
         
         messages = [
             {"role": "system", "content": system_message},
-            {"role": "user", "content": f"Contexto: {context[:1000]}... (truncado)\n\nPregunta: {query}"}
+            {"role": "user", "content": f"Contexto de la conversación:\n{conversation_context}\n\nEspecificaciones de productos:\n{context}\n\nPregunta del usuario: {query}"}
         ]
         
         response = client.chat.completions.create(

@@ -12,50 +12,112 @@ from openai import OpenAI
 from django.conf import settings
 model = SentenceTransformer('all-MiniLM-L6-v2')
 import re
+import json
 def create_embedding(text):
     return model.encode([text])[0]
 
 def get_openai_client():
     return OpenAI(api_key=settings.OPENAI_API_KEY)
 
-def search_similar_documents(query, top_k=3, max_context_length=2000):
-    query_embedding = create_embedding(query)
-    
+def search_similar_documents(query, conversation_context, top_k=3, max_context_length=2000):
     documents = Document.objects.filter(processed=True)
-
-    similarities = []
+    
+    context_info = extract_context_info(conversation_context)
+    print(f"Información extraída del contexto: {context_info}")
+    
+    relevant_specs = []
     for doc in documents:
-        if doc.embedding:  # Verificar que embedding no sea None
-            doc_embedding = np.frombuffer(doc.embedding, dtype=np.float32)
-            similarity = np.dot(query_embedding, doc_embedding) / (np.linalg.norm(query_embedding) * np.linalg.norm(doc_embedding))
-
-            if doc.product_specs:
-                similarity *= 1.2
-            
-            similarities.append((doc, similarity))
-        else:
-            print(f"El documento {doc.file.name} no tiene un embedding válido.")
+        if doc.product_specs:
+            specs = json.loads(doc.product_specs) if isinstance(doc.product_specs, str) else doc.product_specs
+            for spec in specs:
+                relevance_score = calculate_relevance(query, spec, context_info)
+                if relevance_score > 0:
+                    relevant_specs.append((spec, relevance_score))
+                    print(f"Especificación relevante encontrada: {spec['CONTACTOR']} con puntuación {relevance_score}")
     
-    similarities.sort(key=lambda x: x[1], reverse=True)
-    top_documents = similarities[:top_k]
-
+    relevant_specs.sort(key=lambda x: x[1], reverse=True)
+    top_specs = relevant_specs[:top_k]
+    
     context = ""
-    for doc, _ in top_documents:
-        doc_context = (
-            f"Documento: {doc.file.name}\n"
-            f"Marca: {doc.brand}\n"
-            f"Contenido: {doc.content_text[:300]}...\n"
-            f"Especificaciones: {str(doc.product_specs)[:200]}...\n\n"
-        )
-        if len(context) + len(doc_context) > max_context_length:
+    for spec, score in top_specs:
+        spec_context = f"Especificaciones (relevancia: {score:.2f}):\n"
+        for key, value in spec.items():
+            spec_context += f"{key}: {value}\n"
+        spec_context += "\n"
+        
+        if len(context) + len(spec_context) <= max_context_length:
+            context += spec_context
+        else:
             break
-        context += doc_context
-
-    context = context[:max_context_length]
-
-    print(f"Contexto generado (longitud: {len(context)}):\n{context[:1000]}...")
     
-    return context, top_documents
+    print(f"Contexto generado (longitud: {len(context)}):\n{context}")
+    
+    return context, top_specs
+
+def extract_context_info(conversation_context):
+    context_info = {}
+    
+    hp_match = re.search(r'(\d+)\s*Hp', conversation_context, re.IGNORECASE)
+    if hp_match:
+        context_info['hp'] = int(hp_match.group(1))
+    
+    voltage_match = re.search(r'(\d+)V', conversation_context, re.IGNORECASE)
+    if voltage_match:
+        context_info['voltage'] = int(voltage_match.group(1))
+    
+    current_match = re.search(r'(\d+)\s*A', conversation_context, re.IGNORECASE)
+    if current_match:
+        context_info['current'] = int(current_match.group(1))
+    
+    return context_info
+
+def calculate_relevance(query, spec, context_info):
+    relevance = 0
+    
+    hp = context_info.get('hp') or extract_number(query, 'hp')
+    voltage = context_info.get('voltage') or extract_number(query, 'v')
+    current = context_info.get('current') or extract_number(query, 'a')
+    
+    def safe_float(value):
+        try:
+            return float(value)
+        except (ValueError, TypeError):
+            return None
+
+    if hp and 'HP 480V' in spec:
+        spec_hp = safe_float(spec['HP 480V'])
+        if spec_hp is not None and abs(spec_hp - hp) <= 5:
+            relevance += 1
+    
+    if voltage:
+        if 200 <= voltage <= 280 and 'CORRIENTE 240' in spec:
+            relevance += 1
+        elif 380 <= voltage <= 500 and 'CORRIENTE 480V' in spec:
+            relevance += 1
+    
+    if current:
+        if 'CORRIENTE 240' in spec:
+            spec_current = safe_float(spec['CORRIENTE 240'])
+            if spec_current is not None and abs(spec_current - current) <= 5:
+                relevance += 1
+        elif 'CORRIENTE 480V' in spec:
+            spec_current = safe_float(spec['CORRIENTE 480V'])
+            if spec_current is not None and abs(spec_current - current) <= 5:
+                relevance += 1
+    
+    if '110v' in query.lower() and 'CONTACTOR BOBINA 110VAC' in spec:
+        relevance += 1
+    elif '24v' in query.lower() and 'CONTACTOR BOBINA 24VDC' in spec:
+        relevance += 1
+    elif '240v' in query.lower() and 'CONTACTOR BOBINA 240V' in spec:
+        relevance += 1
+    
+    return relevance
+
+def extract_number(text, unit):
+    match = re.search(rf'(\d+)\s*{unit}', text, re.IGNORECASE)
+    return int(match.group(1)) if match else None
+
 
 
 def extract_product_specs(content):
