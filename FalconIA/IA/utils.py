@@ -74,53 +74,6 @@ def extract_context_info(query, conversation_context):
     
     return context_info
 
-# def calculate_relevance(query, spec, context_info):
-#     relevance = 0
-    
-#     hp = context_info.get('hp') or extract_number(query, 'hp')
-#     voltage = context_info.get('voltage') or extract_number(query, 'v')
-#     current = context_info.get('current') or extract_number(query, 'a')
-    
-#     def safe_float(value):
-#         try:
-#             return float(value)
-#         except (ValueError, TypeError):
-#             return None
-
-#     if hp and 'HP 480V' in spec:
-#         spec_hp = safe_float(spec['HP 480V'])
-#         if spec_hp is not None and abs(spec_hp - hp) <= 5:
-#             relevance += 1
-    
-#     if voltage:
-#         if 200 <= voltage <= 280 and 'CORRIENTE 240' in spec:
-#             relevance += 1
-#         elif 380 <= voltage <= 500 and 'CORRIENTE 480V' in spec:
-#             relevance += 1
-    
-#     if current:
-#         if 'CORRIENTE 240' in spec:
-#             spec_current = safe_float(spec['CORRIENTE 240'])
-#             if spec_current is not None and abs(spec_current - current) <= 5:
-#                 relevance += 1
-#         elif 'CORRIENTE 480V' in spec:
-#             spec_current = safe_float(spec['CORRIENTE 480V'])
-#             if spec_current is not None and abs(spec_current - current) <= 5:
-#                 relevance += 1
-    
-#     if '110v' in query.lower() and 'CONTACTOR BOBINA 110VAC' in spec:
-#         relevance += 1
-#     elif '24v' in query.lower() and 'CONTACTOR BOBINA 24VDC' in spec:
-#         relevance += 1
-#     elif '240v' in query.lower() and 'CONTACTOR BOBINA 240V' in spec:
-#         relevance += 1
-    
-#     return relevance
-
-# def extract_number(text, unit):
-#     match = re.search(rf'(\d+)\s*{unit}', text, re.IGNORECASE)
-#     return int(match.group(1)) if match else None
-
 
 def calculate_relevance(query, spec, context_info):
     relevance = 0
@@ -216,8 +169,6 @@ def detect_brand(file_name, sheet_name):
     # Añadir más marcas según sea necesario
     else:
         return "Unknown"
-
-
 
 
 def process_document(document):
