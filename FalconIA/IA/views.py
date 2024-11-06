@@ -178,8 +178,8 @@ def consulta_openai(query, context='', conversation_context='', max_tokens=500):
     
     try:
         system_message = (
-            "Eres un asistente especializado en productos eléctricos de Schneider Electric. "
-            "Tu tarea es recomendar el contactor más adecuado y su guardamotor correspondiente basado en las especificaciones proporcionadas por el usuario. "
+            "Eres un asistente especializado en productos eléctricos de Schneider Electric, Siemens y ABB. "
+            "Tu tarea es recomendar el contactor más adecuado y su guardamotor correspondiente basado en las especificaciones proporcionadas por el usuario, si no te dicen los hp, la corriente, la marca y la tensión de control deberás preguntarla "
             "Prioriza las coincidencias exactas o más cercanas de HP y voltaje. "
             "Si no hay una coincidencia exacta, sugiere la opción más cercana y explica por qué. "
             "Considera que 460V es equivalente a 480V en este contexto. "
